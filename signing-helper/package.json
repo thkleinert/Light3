@@ -8,6 +8,8 @@
   },
   "scripts": {
     "start": "node sign.js",
+    "test": "node --test test/sign.test.js",
+    "test:integration": "node --test test/integration.test.js",
     "pkg": "pkg sign.js --targets node18-macos-x64,node18-macos-arm64 --output dist/light3-sign"
   },
   "dependencies": {

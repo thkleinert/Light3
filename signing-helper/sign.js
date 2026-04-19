@@ -28,9 +28,15 @@ async function main () {
     input += chunk
   }
 
+  const trimmed = input.trim()
+  if (!trimmed) {
+    process.stderr.write('light3-sign: no input received on stdin\n')
+    process.exit(1)
+  }
+
   let config
   try {
-    config = JSON.parse(input.trim())
+    config = JSON.parse(trimmed)
   } catch (e) {
     process.stderr.write('light3-sign: invalid JSON input: ' + e.message + '\n')
     process.exit(1)

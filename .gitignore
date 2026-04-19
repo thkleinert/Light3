@@ -1,3 +1,7 @@
+# Node
+signing-helper/node_modules/
+signing-helper/dist/
+
 # Compiled Lua sources
 luac.out
 
