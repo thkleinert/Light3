@@ -1,0 +1,23 @@
+{
+  "name": "light3-sign",
+  "version": "0.1.0",
+  "description": "Signing helper for the Light3 Lightroom S3 publish plugin",
+  "type": "module",
+  "bin": {
+    "light3-sign": "./sign.js"
+  },
+  "scripts": {
+    "start": "node sign.js",
+    "pkg": "pkg sign.js --targets node18-macos-x64,node18-macos-arm64 --output dist/light3-sign"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.0.0",
+    "@aws-sdk/s3-request-presigner": "^3.0.0"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
