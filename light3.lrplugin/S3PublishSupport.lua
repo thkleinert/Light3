@@ -15,7 +15,7 @@ local S3Upload = require 'S3Upload'
 local signingHelperPath = LrPathUtils.child(_PLUGIN.path, 'light3-sign')
 
 -- ---------------------------------------------------------------------------
--- Filename helpers
+-- Filename template engine
 -- ---------------------------------------------------------------------------
 
 -- Pad a number to at least `width` digits with leading zeros
@@ -25,23 +25,28 @@ local function zeroPad(n, width)
   return s
 end
 
--- Build the S3 filename based on the selected naming scheme.
--- Schemes:
---   'original'          →  <original_filename>            (e.g. DSC_0042.jpg)
---   'sequence_collection' →  <00001>_<CollectionName>.<ext>  (e.g. 00001_Summer.jpg)
-local function buildFilename(scheme, index, total, localPath, collectionName)
+-- Apply a naming template to produce a filename (without extension).
+-- Supported tokens:
+--   <sequence>    zero-padded position in the current publish run
+--   <collection>  sanitised collection name
+--   <file>        original filename without extension
+local function applyTemplate(template, index, total, basename, collectionName)
+  local width  = math.max(5, #tostring(total))
+  local safe   = (collectionName and collectionName ~= '') and collectionName or 'photo'
+  local result = template
+  result = result:gsub('<sequence>',   zeroPad(index, width))
+  result = result:gsub('<collection>', safe)
+  result = result:gsub('<file>',       basename)
+  return result
+end
+
+-- Build the final S3 filename from settings + context
+local function buildFilename(template, index, total, localPath, collectionName)
   local ext      = LrPathUtils.extension(localPath)
   local basename = LrPathUtils.removeExtension(LrPathUtils.leafName(localPath))
   local dotExt   = (ext and ext ~= '') and ('.' .. ext) or ''
-
-  if scheme == 'sequence_collection' then
-    local width = math.max(5, #tostring(total))
-    local safe  = (collectionName ~= '') and collectionName or 'photo'
-    return zeroPad(index, width) .. '_' .. safe .. dotExt
-  end
-
-  -- default: original filename
-  return basename .. dotExt
+  local tpl      = (template and template ~= '') and template or '<file>'
+  return applyTemplate(tpl, index, total, basename, collectionName) .. dotExt
 end
 
 -- ---------------------------------------------------------------------------
@@ -50,6 +55,12 @@ end
 
 local function sectionsForTopOfDialog(f, propertyTable)
   local bind = LrView.bind
+
+  -- Helper: append a token to the template field
+  local function insertToken(token)
+    propertyTable.fileNamingTemplate =
+      (propertyTable.fileNamingTemplate or '') .. token
+  end
 
   return {
     {
@@ -117,29 +128,37 @@ local function sectionsForTopOfDialog(f, propertyTable)
           },
         },
 
-        -- File naming
+        -- File naming template
         f:separator { fill_horizontal = 1 },
         f:row {
           f:static_text { title = 'File naming', width = 120 },
-          f:popup_menu {
-            value = bind 'fileNaming',
-            items = {
-              { title = 'Original filename',          value = 'original' },
-              { title = 'Sequence — Collection name', value = 'sequence_collection' },
-            },
+          f:edit_field {
+            value           = bind 'fileNamingTemplate',
+            width_in_chars  = 30,
+            placeholder_string = '<file>',
+          },
+        },
+        f:row {
+          f:static_text { title = '', width = 120 },
+          f:push_button {
+            title  = '<sequence>',
+            action = function() insertToken('<sequence>') end,
+          },
+          f:push_button {
+            title  = '<collection>',
+            action = function() insertToken('<collection>') end,
+          },
+          f:push_button {
+            title  = '<file>',
+            action = function() insertToken('<file>') end,
           },
         },
         f:row {
           f:static_text { title = '', width = 120 },
           f:static_text {
-            title      = 'e.g.  DSC_0042.jpg',
+            title      = '<sequence> = 00001   <collection> = GalleryName   <file> = DSC_0042',
             text_color = LrColor(0.5, 0.5, 0.5),
-            visible    = bind { key = 'fileNaming', transform = function(v) return v ~= 'sequence_collection' end },
-          },
-          f:static_text {
-            title      = 'e.g.  00001_Summer.jpg',
-            text_color = LrColor(0.5, 0.5, 0.5),
-            visible    = bind { key = 'fileNaming', transform = function(v) return v == 'sequence_collection' end },
+            fill_horizontal = 1,
           },
         },
 
@@ -187,15 +206,15 @@ local function processRenderedPhotos(functionContext, exportContext)
     LrErrors.throwUserError(err)
   end
 
-  local bucket     = LrStringUtils.trimWhitespace(exportSettings.bucket)
-  local keyPrefix  = LrStringUtils.trimWhitespace(exportSettings.keyPrefix or '')
-  local fileNaming = exportSettings.fileNaming or 'original'
+  local bucket      = LrStringUtils.trimWhitespace(exportSettings.bucket)
+  local keyPrefix   = LrStringUtils.trimWhitespace(exportSettings.keyPrefix or '')
+  local fileNamingTemplate = exportSettings.fileNamingTemplate or '<file>'
   -- Normalise prefix: ensure trailing slash if non-empty
   if keyPrefix ~= '' and keyPrefix:sub(-1) ~= '/' then
     keyPrefix = keyPrefix .. '/'
   end
 
-  -- Determine collection name (used both for sub-prefix and file naming)
+  -- Determine collection name (used for sub-prefix and <collection> token)
   local collectionName = ''
   local pubCollection  = exportContext.publishedCollection
   if pubCollection then
@@ -215,7 +234,7 @@ local function processRenderedPhotos(functionContext, exportContext)
 
     if success then
       local localPath = pathOrMessage
-      local filename  = buildFilename(fileNaming, i, nPhotos, localPath, collectionName)
+      local filename  = buildFilename(fileNamingTemplate, i, nPhotos, localPath, collectionName)
       local key       = keyPrefix .. filename
 
       progressScope:setCaption('Uploading ' .. filename)
@@ -286,13 +305,13 @@ return {
 
   -- Defaults
   exportPresetFields = {
-    { key = 'endpoint',        default = '' },
-    { key = 'bucket',          default = '' },
-    { key = 'region',          default = 'auto' },
-    { key = 'accessKeyId',     default = '' },
-    { key = 'secretAccessKey', default = '' },
-    { key = 'keyPrefix',       default = '' },
-    { key = 'fileNaming',      default = 'original' },
+    { key = 'endpoint',           default = '' },
+    { key = 'bucket',             default = '' },
+    { key = 'region',             default = 'auto' },
+    { key = 'accessKeyId',        default = '' },
+    { key = 'secretAccessKey',    default = '' },
+    { key = 'keyPrefix',          default = '' },
+    { key = 'fileNamingTemplate', default = '<file>' },
   },
 
   -- Core publish callbacks
