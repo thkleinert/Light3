@@ -10,8 +10,9 @@
     "start": "node sign.js",
     "test": "node --test test/sign.test.js",
     "test:integration": "node --test test/integration.test.js",
-    "pkg": "pkg sign.js --targets node18-macos-x64,node18-macos-arm64 --output dist/light3-sign && lipo -create -output dist/light3-sign dist/light3-sign-arm64 dist/light3-sign-x64 && chmod +x dist/light3-sign",
-    "install-local": "npm run pkg && cp dist/light3-sign ../light3.lrplugin/light3-sign && cp dist/light3-sign ~/Library/Application\\ Support/Adobe/Lightroom/Modules/light3.lrplugin/light3-sign"
+    "bundle": "esbuild sign.js --bundle --platform=node --format=cjs --outfile=dist/bundle.cjs",
+    "pkg": "npm run bundle && pkg dist/bundle.cjs --targets node18-macos-x64,node18-macos-arm64 --output dist/light3-sign && lipo -create -output dist/light3-sign dist/light3-sign-arm64 dist/light3-sign-x64 && chmod +x dist/light3-sign",
+    "install-local": "bash dev-install.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.0.0",
@@ -21,6 +22,7 @@
     "node": ">=18"
   },
   "devDependencies": {
-    "@yao-pkg/pkg": "^6.17.0"
+    "@yao-pkg/pkg": "^6.17.0",
+    "esbuild": "^0.28.0"
   }
 }
