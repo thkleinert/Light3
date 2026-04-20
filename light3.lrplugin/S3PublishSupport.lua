@@ -3,19 +3,16 @@ S3PublishSupport.lua
 Publish service provider for Light3 — handles Lightroom publish lifecycle.
 ------------------------------------------------------------------------------]]
 
-local LrBinding       = import 'LrBinding'
 local LrColor         = import 'LrColor'
-local LrDialogs       = import 'LrDialogs'
 local LrErrors        = import 'LrErrors'
-local LrFileUtils     = import 'LrFileUtils'
-local LrHttp          = import 'LrHttp'
 local LrPathUtils     = import 'LrPathUtils'
-local LrProgressScope = import 'LrProgressScope'
 local LrStringUtils   = import 'LrStringUtils'
-local LrTasks         = import 'LrTasks'
 local LrView          = import 'LrView'
 
 local S3Upload = require 'S3Upload'
+
+-- Path to the signing helper bundled inside the plugin folder
+local signingHelperPath = LrPathUtils.child(_PLUGIN.path, 'light3-sign')
 
 -- ---------------------------------------------------------------------------
 -- Settings UI
@@ -90,45 +87,6 @@ local function sectionsForTopOfDialog(f, propertyTable)
           },
         },
 
-        -- Signing helper path
-        f:separator { fill_horizontal = 1 },
-        f:row {
-          f:static_text {
-            title = 'Signing helper',
-            width = 120,
-          },
-          f:edit_field {
-            value = bind 'signingHelperPath',
-            width_in_chars = 40,
-            placeholder_string = '/usr/local/bin/light3-sign',
-          },
-          f:push_button {
-            title = 'Browse…',
-            action = function()
-              local path = LrDialogs.runOpenPanel {
-                title = 'Select signing helper',
-                canChooseFiles = true,
-                canChooseDirectories = false,
-                allowsMultipleSelection = false,
-              }
-              if path and path[1] then
-                propertyTable.signingHelperPath = path[1]
-              end
-            end,
-          },
-        },
-
-        f:row {
-          f:static_text {
-            title = '',
-            width = 120,
-          },
-          f:static_text {
-            title = 'The signing helper generates presigned upload URLs.\nSee signing-helper/ in the Light3 repo.',
-            text_color = LrColor(0.5, 0.5, 0.5),
-            height_in_lines = 2,
-          },
-        },
       },
     },
   }
@@ -213,7 +171,7 @@ local function processRenderedPhotos(functionContext, exportContext)
         region            = exportSettings.region or 'auto',
         accessKeyId       = exportSettings.accessKeyId,
         secretAccessKey   = exportSettings.secretAccessKey,
-        signingHelperPath = exportSettings.signingHelperPath,
+        signingHelperPath = signingHelperPath,
       }
 
       if uploadOk then
@@ -246,7 +204,7 @@ local function deletePhotosFromPublishedCollection(functionContext, publishSetti
       region            = publishSettings.region or 'auto',
       accessKeyId       = publishSettings.accessKeyId,
       secretAccessKey   = publishSettings.secretAccessKey,
-      signingHelperPath = publishSettings.signingHelperPath,
+      signingHelperPath = signingHelperPath,
     }
   end
 end
@@ -271,13 +229,12 @@ return {
 
   -- Defaults
   exportPresetFields = {
-    { key = 'endpoint',          default = '' },
-    { key = 'bucket',            default = '' },
-    { key = 'region',            default = 'auto' },
-    { key = 'accessKeyId',       default = '' },
-    { key = 'secretAccessKey',   default = '' },
-    { key = 'keyPrefix',         default = '' },
-    { key = 'signingHelperPath', default = '' },
+    { key = 'endpoint',        default = '' },
+    { key = 'bucket',          default = '' },
+    { key = 'region',          default = 'auto' },
+    { key = 'accessKeyId',     default = '' },
+    { key = 'secretAccessKey', default = '' },
+    { key = 'keyPrefix',       default = '' },
   },
 
   -- Core publish callbacks
