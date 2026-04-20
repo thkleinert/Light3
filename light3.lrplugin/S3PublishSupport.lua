@@ -124,24 +124,22 @@ local function sectionsForTopOfDialog(f, propertyTable)
           f:popup_menu {
             value = bind 'fileNaming',
             items = {
-              { title = 'Original filename',              value = 'original' },
-              { title = 'Sequence — Collection name',     value = 'sequence_collection' },
+              { title = 'Original filename',          value = 'original' },
+              { title = 'Sequence — Collection name', value = 'sequence_collection' },
             },
           },
         },
         f:row {
           f:static_text { title = '', width = 120 },
           f:static_text {
-            title = bind {
-              key = 'fileNaming',
-              transform = function(v)
-                if v == 'sequence_collection' then
-                  return 'e.g.  00001_Summer.jpg'
-                end
-                return 'e.g.  DSC_0042.jpg'
-              end,
-            },
+            title      = 'e.g.  DSC_0042.jpg',
             text_color = LrColor(0.5, 0.5, 0.5),
+            visible    = bind { key = 'fileNaming', transform = function(v) return v ~= 'sequence_collection' end },
+          },
+          f:static_text {
+            title      = 'e.g.  00001_Summer.jpg',
+            text_color = LrColor(0.5, 0.5, 0.5),
+            visible    = bind { key = 'fileNaming', transform = function(v) return v == 'sequence_collection' end },
           },
         },
 
@@ -278,7 +276,7 @@ return {
   small_icon                 = 'S3_small.png',
 
   -- Metadata
-  hideSections     = { 'exportLocation' },
+  hideSections     = { 'exportLocation', 'fileNaming' },
   allowFileFormats = { 'JPEG', 'TIFF', 'PNG', 'DNG' },
   allowColorSpaces = nil,  -- all allowed
   canExportVideo   = false,
