@@ -44,14 +44,8 @@ local function getPresignedUrl(params, method)
   -- Escape single quotes in config for shell safety
   config = config:gsub("'", "'\\''")
 
-  local cmd = string.format("echo '%s' | '%s'", config, helperPath)
-  local result = LrTasks.execute(cmd)
-
-  -- LrTasks.execute returns exit code; we need stdout
-  -- Use a temp file to capture output
-  local tmpFile = LrFileUtils.chooseUniqueFileName(
-    LrFileUtils.standardFilePath('temp') .. '/light3_presign.txt'
-  )
+  -- LrTasks.execute returns only an exit code; capture stdout via a temp file
+  local tmpFile = string.format('/tmp/light3_presign_%d.txt', os.time())
   local cmdWithOutput = string.format("echo '%s' | '%s' > '%s' 2>&1", config, helperPath, tmpFile)
   local exitCode = LrTasks.execute(cmdWithOutput)
 
