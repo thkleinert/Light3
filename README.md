@@ -33,39 +33,17 @@ The signing helper runs locally — your credentials never leave your machine.
 ## Requirements
 
 - **Lightroom Classic** 6 or later
-- **Node.js** 18 or later
 - An S3-compatible bucket (Cloudflare R2, AWS S3, etc.)
 
 ---
 
 ## Installation
 
-### 1. Clone the repo
+### 1. Download the plugin
 
-```bash
-git clone https://github.com/thkleinert/Light3.git
-cd Light3
-```
+Go to the [Releases page](https://github.com/thkleinert/Light3/releases) and download the latest `light3-vX.Y.Z.lrplugin.zip`. Unzip it — you'll get a `light3.lrplugin` folder with the signing helper already bundled inside.
 
-### 2. Build and install the signing helper
-
-```bash
-cd signing-helper
-npm install
-npm run install-local
-```
-
-`install-local` creates a `light3-sign` script inside `light3.lrplugin/` and in your Lightroom Modules directory. The plugin finds it automatically — no path configuration needed.
-
-Verify it works:
-
-```bash
-echo '{"endpoint":"https://example.com","bucket":"test","region":"auto","accessKeyId":"key","secretAccessKey":"secret","key":"photo.jpg","method":"PUT"}' \
-  | ../light3.lrplugin/light3-sign
-# → prints a presigned URL
-```
-
-### 3. Install the Lightroom plugin
+### 2. Install the Lightroom plugin
 
 Option A — copy to the standard plugins folder:
 
@@ -218,14 +196,15 @@ Light3/
 │   ├── S3PublishSupport.lua    # Publish service UI and callbacks
 │   ├── S3Upload.lua            # Upload/delete via presigned URLs + curl
 │   ├── S3_small.png            # Plugin icon
-│   └── light3-sign             # Signing helper (built locally, not in git)
-└── signing-helper/
-    ├── sign.js                 # Presigned URL generator (Node.js / ESM)
-    ├── dev-install.sh          # Builds and installs light3-sign locally
-    ├── package.json
-    └── test/
-        ├── sign.test.js        # Unit tests
-        └── integration.test.js # Integration test (needs real credentials)
+│   └── light3-sign             # Signing helper binary (built locally or via CI, not in git)
+├── signing-helper-go/
+│   ├── main.go                 # Presigned URL generator (Go / aws-sdk-go-v2)
+│   ├── build.sh                # Builds universal macOS binary and installs locally
+│   ├── go.mod
+│   └── go.sum
+└── .github/workflows/
+    ├── release-please.yml      # Automates Release PRs and versioning
+    └── release.yml             # Builds binary + zips plugin on release
 ```
 
 ---
@@ -233,7 +212,7 @@ Light3/
 ## Troubleshooting
 
 **"Signing helper failed (exit …)"**
-→ Run `npm run install-local` in `signing-helper/` to rebuild and redeploy the helper, then reload the plugin in Lightroom.
+→ Make sure you downloaded the plugin from the [Releases page](https://github.com/thkleinert/Light3/releases) — the zip includes the pre-built `light3-sign` binary. If you cloned the repo directly, build the binary manually (see **Contributing** below).
 
 **HTTP 403 on upload**
 → The presigned URL was generated but the bucket rejected it. Check:
@@ -251,13 +230,6 @@ Light3/
 
 ## Development
 
-### Running tests
-
-```bash
-cd signing-helper
-npm test
-```
-
 ### Reloading the plugin in Lightroom
 
 After editing `.lua` files:
@@ -265,15 +237,30 @@ After editing `.lua` files:
 
 No Lua build step is required.
 
-### Rebuilding the signing helper
+### Building the signing helper locally
+
+Requires Go 1.22+.
 
 ```bash
-cd signing-helper
-npm run install-local
+cd signing-helper-go
+bash build.sh --install
 ```
 
-This rebuilds `light3-sign` and copies it to both `light3.lrplugin/` and your Lightroom Modules directory.
+This builds a universal macOS binary (`dist/light3-sign`) and copies it to both `light3.lrplugin/` and your Lightroom Modules directory. The binary is not checked into git — it is built by the release pipeline and bundled into the release zip automatically.
+
+### Releases
+
+Releases are automated via [release-please](https://github.com/googleapis/release-please). Use [conventional commits](https://www.conventionalcommits.org/) when merging to `main`:
+
+| Prefix | Effect |
+|---|---|
+| `feat:` | minor version bump |
+| `fix:` | patch version bump |
+| `feat!:` / `BREAKING CHANGE:` | major version bump |
+| `chore:`, `docs:`, `test:` | no version bump |
+
+release-please opens a Release PR automatically. Merging it creates the tag and GitHub release. The release workflow then builds the universal binary and attaches `light3-vX.Y.Z.lrplugin.zip` to the release.
 
 ### Contributing
 
-Pull requests welcome. Keep the signing helper dependency-light (only `@aws-sdk` packages) and the Lua code compatible with Lightroom Classic SDK 5+.
+Pull requests welcome. Keep the signing helper dependency-light (only `aws-sdk-go-v2` packages) and the Lua code compatible with Lightroom Classic SDK 5+.

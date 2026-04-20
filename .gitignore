@@ -2,7 +2,10 @@
 signing-helper/node_modules/
 signing-helper/dist/
 
-# Bundled signing helper binary (built locally via `cd signing-helper && npm run install-local`)
+# Go build output
+signing-helper-go/dist/
+
+# Bundled signing helper binary (built locally or via release pipeline)
 light3.lrplugin/light3-sign
 
 # Compiled Lua sources
