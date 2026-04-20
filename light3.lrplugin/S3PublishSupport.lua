@@ -15,6 +15,32 @@ local S3Upload = require 'S3Upload'
 local signingHelperPath = LrPathUtils.child(_PLUGIN.path, 'light3-sign')
 
 -- ---------------------------------------------------------------------------
+-- Collection path helper
+-- ---------------------------------------------------------------------------
+
+-- Walk the parent chain of a published collection and return the full
+-- slash-separated path of collection set names, e.g. "Travel/2024/Summer".
+-- Stops when getParent() fails or returns something without getParent itself
+-- (i.e. the publish service root).
+local function collectionSetPath(collection)
+  local parts = {}
+  local ok, parent = pcall(function() return collection:getParent() end)
+  while ok and parent do
+    -- If the parent itself has no getParent it's the service root — stop
+    local hasParent = pcall(function() return parent:getParent() end)
+    if not hasParent then break end
+
+    local name = parent:getName() or ''
+    name = name:gsub('[^%w%-_ ]', '_')
+    if name ~= '' then
+      table.insert(parts, 1, name)
+    end
+    ok, parent = pcall(function() return parent:getParent() end)
+  end
+  return table.concat(parts, '/')
+end
+
+-- ---------------------------------------------------------------------------
 -- Filename template engine
 -- ---------------------------------------------------------------------------
 
@@ -214,13 +240,20 @@ local function processRenderedPhotos(functionContext, exportContext)
     keyPrefix = keyPrefix .. '/'
   end
 
-  -- Determine collection name (used for sub-prefix and <collection> token)
+  -- Build the S3 prefix from the full collection set hierarchy + collection name
+  -- e.g.  keyPrefix / Travel/2024/Summer / Beach /
   local collectionName = ''
   local pubCollection  = exportContext.publishedCollection
   if pubCollection then
-    collectionName = pubCollection:getName()
-    -- sanitise for use as path segment / filename part
-    collectionName = collectionName:gsub('[^%w%-_]', '_')
+    -- Parent collection sets (may be empty if collection is at the root)
+    local setPath = collectionSetPath(pubCollection)
+    if setPath ~= '' then
+      keyPrefix = keyPrefix .. setPath .. '/'
+    end
+
+    -- The collection itself
+    collectionName = pubCollection:getName() or ''
+    collectionName = collectionName:gsub('[^%w%-_ ]', '_')
     if collectionName ~= '' then
       keyPrefix = keyPrefix .. collectionName .. '/'
     end
