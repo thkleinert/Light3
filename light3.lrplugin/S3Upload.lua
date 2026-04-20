@@ -4,32 +4,38 @@ Handles uploading and deleting objects in S3-compatible storage.
 
 Strategy: delegate AWS Signature V4 signing to an external helper binary
 (signing-helper/light3-sign) which returns a presigned URL. The plugin then
-does a plain HTTP PUT to that URL — no crypto needed in Lua.
-
-Fallback: if no signing helper is configured, attempt a direct PUT using the
-signing helper via stdin/stdout pipe (same binary, different invocation).
+does a plain HTTP PUT/DELETE to that URL via curl — no crypto needed in Lua.
 ------------------------------------------------------------------------------]]
 
-local LrFileUtils  = import 'LrFileUtils'
-local LrHttp       = import 'LrHttp'
-local LrTasks      = import 'LrTasks'
+local LrFileUtils = import 'LrFileUtils'
+local LrTasks     = import 'LrTasks'
 
 local M = {}
 
 -- ---------------------------------------------------------------------------
--- Internal: call the signing helper to get a presigned PUT URL
--- Returns: url (string) or nil, errorMessage (string)
+-- Internal helpers
 -- ---------------------------------------------------------------------------
 
+local function readFile(path)
+  local f = io.open(path, 'r')
+  if not f then return '' end
+  local s = f:read('*all') or ''
+  f:close()
+  return s
+end
+
+local function tmpPath(tag)
+  return string.format('/tmp/light3_%s_%d.txt', tag, os.time())
+end
+
+-- Call the signing helper to get a presigned URL.
+-- Returns: url (string) or nil, errorMessage (string)
 local function getPresignedUrl(params, method)
   local helperPath = params.signingHelperPath or ''
   if helperPath == '' then
-    return nil, 'No signing helper configured. Please set the helper path in plugin settings.'
+    return nil, 'No signing helper path configured.'
   end
 
-  -- Build the command — the helper reads JSON from stdin and writes a URL to stdout
-  -- Usage: light3-sign <json-config>
-  -- Config fields: endpoint, bucket, region, accessKeyId, secretAccessKey, key, method, expiresIn
   local config = string.format(
     '{"endpoint":"%s","bucket":"%s","region":"%s","accessKeyId":"%s","secretAccessKey":"%s","key":"%s","method":"%s","expiresIn":3600}',
     params.endpoint,
@@ -40,135 +46,108 @@ local function getPresignedUrl(params, method)
     params.key,
     method or 'PUT'
   )
+  config = config:gsub("'", "'\\''")  -- escape single quotes for shell
 
-  -- Escape single quotes in config for shell safety
-  config = config:gsub("'", "'\\''")
+  local out    = tmpPath('url')
+  local cmd    = string.format("echo '%s' | '%s' > '%s' 2>&1", config, helperPath, out)
+  local code   = LrTasks.execute(cmd)
 
-  -- LrTasks.execute returns only an exit code; capture stdout via a temp file
-  local tmpFile = string.format('/tmp/light3_presign_%d.txt', os.time())
-  local cmdWithOutput = string.format("echo '%s' | '%s' > '%s' 2>&1", config, helperPath, tmpFile)
-  local exitCode = LrTasks.execute(cmdWithOutput)
+  local url = readFile(out)
+  LrFileUtils.delete(out)
 
-  if exitCode ~= 0 then
-    local errMsg = 'Signing helper failed (exit ' .. tostring(exitCode) .. ')'
-    if LrFileUtils.exists(tmpFile) then
-      local f = io.open(tmpFile, 'r')
-      if f then
-        errMsg = errMsg .. ': ' .. (f:read('*all') or '')
-        f:close()
-      end
-      LrFileUtils.delete(tmpFile)
-    end
-    return nil, errMsg
+  if code ~= 0 then
+    return nil, string.format('Signing helper failed (exit %d): %s', code, url:sub(1, 200))
   end
 
-  local url = nil
-  if LrFileUtils.exists(tmpFile) then
-    local f = io.open(tmpFile, 'r')
-    if f then
-      url = f:read('*all')
-      f:close()
-    end
-    LrFileUtils.delete(tmpFile)
-  end
-
-  if not url or url == '' then
-    return nil, 'Signing helper returned empty URL'
-  end
-
-  -- Trim whitespace/newlines
   url = url:match('^%s*(.-)%s*$')
+  if not url or url == '' then
+    return nil, 'Signing helper returned an empty URL'
+  end
+
   return url, nil
 end
 
+-- Run a curl command, return (httpStatus, responseBody)
+local function curlRequest(curlArgs)
+  local statusFile = tmpPath('status')
+  local bodyFile   = tmpPath('body')
+
+  -- -o  → response body to bodyFile
+  -- -w  → write only the status code to stdout → redirected to statusFile
+  local cmd = string.format(
+    "curl -s -o '%s' -w '%%{http_code}' %s > '%s' 2>&1",
+    bodyFile, curlArgs, statusFile
+  )
+  LrTasks.execute(cmd)
+
+  local status = tonumber(readFile(statusFile))
+  local body   = readFile(bodyFile)
+  LrFileUtils.delete(statusFile)
+  LrFileUtils.delete(bodyFile)
+
+  return status, body
+end
+
 -- ---------------------------------------------------------------------------
--- Upload a file to S3
--- params: localPath, key, endpoint, bucket, region, accessKeyId,
---         secretAccessKey, signingHelperPath
--- Returns: true or false, errorMessage
+-- MIME type lookup
+-- ---------------------------------------------------------------------------
+
+local mimeTypes = {
+  jpg  = 'image/jpeg',
+  jpeg = 'image/jpeg',
+  tif  = 'image/tiff',
+  tiff = 'image/tiff',
+  png  = 'image/png',
+  dng  = 'image/x-adobe-dng',
+  mp4  = 'video/mp4',
+  mov  = 'video/quicktime',
+}
+
+-- ---------------------------------------------------------------------------
+-- Public: upload a file to S3
+-- params: localPath, key, endpoint, bucket, region,
+--         accessKeyId, secretAccessKey, signingHelperPath
+-- Returns: true  or  false, errorMessage
 -- ---------------------------------------------------------------------------
 
 function M.upload(params)
-  -- Get presigned PUT URL
   local presignedUrl, err = getPresignedUrl(params, 'PUT')
-  if not presignedUrl then
-    return false, err
-  end
+  if not presignedUrl then return false, err end
 
-  -- Read file contents
-  local f = io.open(params.localPath, 'rb')
-  if not f then
-    return false, 'Could not open file: ' .. params.localPath
-  end
-  local fileData = f:read('*all')
-  f:close()
+  local ext         = (params.localPath:match('%.([^%.]+)$') or ''):lower()
+  local contentType = mimeTypes[ext] or 'application/octet-stream'
 
-  if not fileData then
-    return false, 'Could not read file: ' .. params.localPath
-  end
-
-  -- Determine MIME type from extension
-  local ext = params.localPath:match('%.([^%.]+)$')
-  local mimeTypes = {
-    jpg  = 'image/jpeg',
-    jpeg = 'image/jpeg',
-    tif  = 'image/tiff',
-    tiff = 'image/tiff',
-    png  = 'image/png',
-    dng  = 'image/x-adobe-dng',
-    mp4  = 'video/mp4',
-    mov  = 'video/quicktime',
-  }
-  local contentType = mimeTypes[(ext or ''):lower()] or 'application/octet-stream'
-
-  -- PUT to presigned URL — no auth headers needed, the URL is already signed
-  local result, hdrs = LrHttp.post(
-    presignedUrl,
-    fileData,
-    {
-      { field = 'Content-Type', value = contentType },
-    },
-    'PUT',
-    contentType,
-    #fileData
+  -- curl -T uploads the file as the request body (streaming, no RAM spike)
+  local args = string.format(
+    "-X PUT -H 'Content-Type: %s' -T '%s' '%s'",
+    contentType, params.localPath, presignedUrl
   )
+  local status, body = curlRequest(args)
 
-  -- S3 returns 200 or 204 on success
-  local status = hdrs and hdrs.status
   if status == 200 or status == 204 then
     return true
   else
-    local body = result or ''
-    return false, string.format('S3 PUT failed (HTTP %s): %s', tostring(status), body:sub(1, 200))
+    return false, string.format('S3 PUT failed (HTTP %s): %s',
+      tostring(status), body:sub(1, 200))
   end
 end
 
 -- ---------------------------------------------------------------------------
--- Delete an object from S3
--- params: key, endpoint, bucket, region, accessKeyId, secretAccessKey,
---         signingHelperPath
--- Returns: true or false, errorMessage
+-- Public: delete an object from S3
+-- params: key, endpoint, bucket, region,
+--         accessKeyId, secretAccessKey, signingHelperPath
+-- Returns: true  or  false, errorMessage
 -- ---------------------------------------------------------------------------
 
 function M.delete(params)
   local presignedUrl, err = getPresignedUrl(params, 'DELETE')
-  if not presignedUrl then
-    return false, err
-  end
+  if not presignedUrl then return false, err end
 
-  local result, hdrs = LrHttp.post(
-    presignedUrl,
-    '',
-    {},
-    'DELETE',
-    'application/octet-stream',
-    0
-  )
+  local args   = string.format("-X DELETE '%s'", presignedUrl)
+  local status = curlRequest(args)
 
-  local status = hdrs and hdrs.status
   if status == 200 or status == 204 or status == 404 then
-    -- 404 is fine — object already gone
-    return true
+    return true  -- 404 is fine — object already gone
   else
     return false, string.format('S3 DELETE failed (HTTP %s)', tostring(status))
   end
