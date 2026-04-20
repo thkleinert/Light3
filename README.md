@@ -122,6 +122,24 @@ The file extension is always appended automatically.
 
 Photos within a collection can be reordered by drag-and-drop in Lightroom. Light3 respects this order — combined with the `<sequence>` token, the upload sequence matches your Lightroom ordering exactly.
 
+After every publish run, Light3 writes an `order.json` sidecar file to the collection's S3 prefix. This file contains the full ordered list of photo keys as they appear in Lightroom, so downstream consumers (galleries, websites) can display photos in the correct sequence without relying on filename sorting.
+
+Example `order.json` for a collection at `galleries/Weddings/Smith_2026/`:
+
+```json
+{
+  "collection": "Smith_2026",
+  "prefix": "galleries/Weddings/Smith_2026/",
+  "photos": [
+    "galleries/Weddings/Smith_2026/00003_DSC_0099.jpg",
+    "galleries/Weddings/Smith_2026/00001_DSC_0042.jpg",
+    "galleries/Weddings/Smith_2026/00002_DSC_0077.jpg"
+  ]
+}
+```
+
+`order.json` is updated on every publish, including when photos are removed. If you reorder photos without changing any images, just click **Publish** to push the updated order without re-uploading any files.
+
 ### Re-publishing
 
 Lightroom tracks which photos have been published. If you edit a photo and re-publish, only changed photos are re-uploaded.
