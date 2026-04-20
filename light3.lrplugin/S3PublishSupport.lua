@@ -3,22 +3,19 @@ S3PublishSupport.lua
 Publish service provider for Light3 — handles Lightroom publish lifecycle.
 ------------------------------------------------------------------------------]]
 
-local LrBinding      = import 'LrBinding'
-local LrColor        = import 'LrColor'
-local LrDialogs      = import 'LrDialogs'
-local LrErrors       = import 'LrErrors'
-local LrFileUtils    = import 'LrFileUtils'
-local LrHttp         = import 'LrHttp'
-local LrPathUtils    = import 'LrPathUtils'
-local LrPrefs        = import 'LrPrefs'
+local LrBinding       = import 'LrBinding'
+local LrColor         = import 'LrColor'
+local LrDialogs       = import 'LrDialogs'
+local LrErrors        = import 'LrErrors'
+local LrFileUtils     = import 'LrFileUtils'
+local LrHttp          = import 'LrHttp'
+local LrPathUtils     = import 'LrPathUtils'
 local LrProgressScope = import 'LrProgressScope'
-local LrStringUtils  = import 'LrStringUtils'
-local LrTasks        = import 'LrTasks'
-local LrView         = import 'LrView'
+local LrStringUtils   = import 'LrStringUtils'
+local LrTasks         = import 'LrTasks'
+local LrView          = import 'LrView'
 
 local S3Upload = require 'S3Upload'
-
-local prefs = LrPrefs.prefsForPlugin()
 
 -- ---------------------------------------------------------------------------
 -- Settings UI
@@ -29,7 +26,7 @@ local function sectionsForTopOfDialog(f, propertyTable)
 
   return {
     {
-      title = 'S3 Connection',
+      title = 'Light3',
       synopsis = bind 'endpoint',
 
       f:column {
@@ -243,12 +240,12 @@ end
 local function deletePhotosFromPublishedCollection(functionContext, publishSettings, arrayOfPhotoIds)
   for _, photoId in ipairs(arrayOfPhotoIds) do
     S3Upload.delete {
-      key             = photoId,
-      endpoint        = publishSettings.endpoint,
-      bucket          = publishSettings.bucket,
-      region          = publishSettings.region or 'auto',
-      accessKeyId     = publishSettings.accessKeyId,
-      secretAccessKey = publishSettings.secretAccessKey,
+      key               = photoId,
+      endpoint          = publishSettings.endpoint,
+      bucket            = publishSettings.bucket,
+      region            = publishSettings.region or 'auto',
+      accessKeyId       = publishSettings.accessKeyId,
+      secretAccessKey   = publishSettings.secretAccessKey,
       signingHelperPath = publishSettings.signingHelperPath,
     }
   end
@@ -260,12 +257,14 @@ end
 
 return {
 
+  supportsIncrementalPublish = 'only',
+  small_icon                 = 'S3_small.png',
+
   -- Metadata
-  hideSections         = { 'exportLocation' },
-  allowFileFormats     = { 'JPEG', 'TIFF', 'PNG', 'DNG' },
-  allowColorSpaces     = nil,  -- all allowed
-  canExportVideo       = false,
-  small_icon           = 'Resources/S3_small.png',
+  hideSections     = { 'exportLocation' },
+  allowFileFormats = { 'JPEG', 'TIFF', 'PNG', 'DNG' },
+  allowColorSpaces = nil,  -- all allowed
+  canExportVideo   = false,
 
   -- Settings UI
   sectionsForTopOfDialog = sectionsForTopOfDialog,
@@ -282,11 +281,12 @@ return {
   },
 
   -- Core publish callbacks
-  processRenderedPhotos                 = processRenderedPhotos,
-  deletePhotosFromPublishedCollection   = deletePhotosFromPublishedCollection,
+  processRenderedPhotos               = processRenderedPhotos,
+  deletePhotosFromPublishedCollection = deletePhotosFromPublishedCollection,
 
   -- Optional: called when a collection is renamed — update the prefix if needed
   renamePublishedCollection = function(publishSettings, info)
     -- No-op for now; keys are not renamed automatically
   end,
+
 }

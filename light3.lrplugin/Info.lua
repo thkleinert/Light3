@@ -5,8 +5,8 @@ Light3 — Lightroom publish plugin for S3-compatible storage
 
 return {
 
-  LrSdkVersion         = 10.0,
-  LrSdkMinimumVersion  = 6.0,
+  LrSdkVersion         = 5.0,
+  LrSdkMinimumVersion  = 5.0,
 
   LrToolkitIdentifier  = 'com.thkleinert.light3',
   LrPluginName         = 'Light3 — S3 Publisher',
@@ -18,15 +18,8 @@ return {
     display = '0.1.0',
   },
 
-  LrPublishServiceProvider = {
-    title            = 'Light3 (S3)',
-    file             = 'S3PublishSupport.lua',
-    builtInIcon      = 'S3.png',  -- optional, add later
-    publishMenuName  = 'Publish to S3',
-  },
-
   LrExportServiceProvider = {
-    title = 'Light3 (S3)',
+    title = 'Light3',
     file  = 'S3PublishSupport.lua',
   },
 
