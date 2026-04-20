@@ -80,6 +80,19 @@ func main() {
 			os.Exit(1)
 		}
 		url = res.URL
+	case "GET":
+		res, err := presigner.PresignGetObject(ctx,
+			&s3.GetObjectInput{
+				Bucket: aws.String(in.Bucket),
+				Key:    aws.String(in.Key),
+			},
+			s3.WithPresignExpires(expires),
+		)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "light3-sign: presign failed: %v\n", err)
+			os.Exit(1)
+		}
+		url = res.URL
 	default: // PUT
 		res, err := presigner.PresignPutObject(ctx,
 			&s3.PutObjectInput{

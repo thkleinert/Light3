@@ -133,6 +133,70 @@ function M.upload(params)
 end
 
 -- ---------------------------------------------------------------------------
+-- Public: download an object from S3 and return its contents as a string
+-- params: key, endpoint, bucket, region,
+--         accessKeyId, secretAccessKey, signingHelperPath
+-- Returns: content (string) or nil on error
+-- ---------------------------------------------------------------------------
+
+function M.getContent(params)
+  local presignedUrl = getPresignedUrl(params, 'GET')
+  if not presignedUrl then return nil end
+
+  local statusFile = tmpPath('getstatus')
+  local bodyFile   = tmpPath('get')
+  local cmd = string.format(
+    "curl -s -o '%s' -w '%%{http_code}' '%s' > '%s' 2>&1",
+    bodyFile, presignedUrl, statusFile
+  )
+  LrTasks.execute(cmd)
+  local status = tonumber(readFile(statusFile))
+  local body   = readFile(bodyFile)
+  LrFileUtils.delete(statusFile)
+  LrFileUtils.delete(bodyFile)
+
+  if status == 200 then
+    return body
+  end
+  return nil
+end
+
+-- ---------------------------------------------------------------------------
+-- Public: upload a string as a file to S3
+-- params: content, key, endpoint, bucket, region,
+--         accessKeyId, secretAccessKey, signingHelperPath
+-- Returns: true  or  false, errorMessage
+-- ---------------------------------------------------------------------------
+
+function M.putContent(params)
+  local tmpFile = tmpPath('content')
+  local f = io.open(tmpFile, 'w')
+  if not f then return false, 'Could not write temp file for putContent' end
+  f:write(params.content or '')
+  f:close()
+
+  local presignedUrl, err = getPresignedUrl(params, 'PUT')
+  if not presignedUrl then
+    LrFileUtils.delete(tmpFile)
+    return false, err
+  end
+
+  local args = string.format(
+    "-X PUT -H 'Content-Type: application/json' -T '%s' '%s'",
+    tmpFile, presignedUrl
+  )
+  local status, body = curlRequest(args)
+  LrFileUtils.delete(tmpFile)
+
+  if status == 200 or status == 204 then
+    return true
+  else
+    return false, string.format('S3 PUT failed (HTTP %s): %s',
+      tostring(status), body:sub(1, 200))
+  end
+end
+
+-- ---------------------------------------------------------------------------
 -- Public: delete an object from S3
 -- params: key, endpoint, bucket, region,
 --         accessKeyId, secretAccessKey, signingHelperPath

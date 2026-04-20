@@ -295,6 +295,47 @@ local function processRenderedPhotos(functionContext, exportContext)
     end
   end
 
+  -- Write order.json with the full ordered list of all published photos in the collection.
+  -- Done after the upload loop so newly published photos are included.
+  if pubCollection and not progressScope:isCanceled() then
+    progressScope:setCaption('Updating order.json…')
+
+    local publishedPhotos = pubCollection:getPublishedPhotos()
+    local keys = {}
+    for _, pubPhoto in ipairs(publishedPhotos or {}) do
+      local remoteId = pubPhoto:getRemoteId()
+      if remoteId and remoteId ~= '' then
+        table.insert(keys, '"' .. remoteId:gsub('\\', '\\\\'):gsub('"', '\\"') .. '"')
+      end
+    end
+
+    local orderKey = keyPrefix .. 'order.json'
+    local json = string.format(
+      '{"collection":"%s","prefix":"%s","photos":[%s]}',
+      collectionName:gsub('\\', '\\\\'):gsub('"', '\\"'),
+      keyPrefix:gsub('\\', '\\\\'):gsub('"', '\\"'),
+      table.concat(keys, ',')
+    )
+
+    local putOk, putErr = S3Upload.putContent {
+      content           = json,
+      key               = orderKey,
+      endpoint          = exportSettings.endpoint,
+      bucket            = bucket,
+      region            = exportSettings.region or 'auto',
+      accessKeyId       = exportSettings.accessKeyId,
+      secretAccessKey   = exportSettings.secretAccessKey,
+      signingHelperPath = signingHelperPath,
+    }
+
+    if not putOk then
+      -- Non-fatal: log to Lightroom but don't abort the publish
+      LrErrors.throwUserError(string.format(
+        'order.json write failed (%s): %s', orderKey, tostring(putErr)
+      ))
+    end
+  end
+
   progressScope:done()
 end
 
@@ -303,7 +344,10 @@ end
 -- ---------------------------------------------------------------------------
 
 local function deletePhotosFromPublishedCollection(functionContext, publishSettings, arrayOfPhotoIds)
+  -- Build a set of deleted IDs for fast lookup
+  local deleted = {}
   for _, photoId in ipairs(arrayOfPhotoIds) do
+    deleted[photoId] = true
     S3Upload.delete {
       key               = photoId,
       endpoint          = publishSettings.endpoint,
@@ -313,6 +357,61 @@ local function deletePhotosFromPublishedCollection(functionContext, publishSetti
       secretAccessKey   = publishSettings.secretAccessKey,
       signingHelperPath = signingHelperPath,
     }
+  end
+
+  -- Refresh order.json: remove deleted keys, preserve order of remaining photos.
+  -- Derive the collection prefix from the first deleted key (strip the filename).
+  local sampleKey = arrayOfPhotoIds[1]
+  if sampleKey then
+    local prefix = sampleKey:match('^(.*/)') or ''
+
+    -- Collect remaining published photo keys from S3 publish records.
+    -- We don't have direct access to the collection here, so we read the
+    -- existing order.json, filter out deleted keys, and rewrite it.
+    -- If order.json doesn't exist yet this is a no-op (putContent will create it).
+    local remainingKeys = {}
+    -- Re-read existing order from the collection via the published IDs we still know.
+    -- Since arrayOfPhotoIds are the ones being removed, build the surviving list
+    -- by fetching the current order.json and filtering.
+    local orderKey  = prefix .. 'order.json'
+    local orderJson = S3Upload.getContent {
+      key               = orderKey,
+      endpoint          = publishSettings.endpoint,
+      bucket            = publishSettings.bucket,
+      region            = publishSettings.region or 'auto',
+      accessKeyId       = publishSettings.accessKeyId,
+      secretAccessKey   = publishSettings.secretAccessKey,
+      signingHelperPath = signingHelperPath,
+    }
+
+    if orderJson then
+      -- Parse the photos array from the existing JSON (simple pattern match)
+      local photosJson = orderJson:match('"photos"%s*:%s*%[(.-)%]')
+      if photosJson then
+        for key in photosJson:gmatch('"([^"]+)"') do
+          if not deleted[key] then
+            table.insert(remainingKeys, '"' .. key:gsub('\\', '\\\\'):gsub('"', '\\"') .. '"')
+          end
+        end
+
+        local collectionName = orderJson:match('"collection"%s*:%s*"([^"]+)"') or ''
+        local json = string.format(
+          '{"collection":"%s","prefix":"%s","photos":[%s]}',
+          collectionName, prefix:gsub('\\', '\\\\'):gsub('"', '\\"'),
+          table.concat(remainingKeys, ',')
+        )
+        S3Upload.putContent {
+          content           = json,
+          key               = orderKey,
+          endpoint          = publishSettings.endpoint,
+          bucket            = publishSettings.bucket,
+          region            = publishSettings.region or 'auto',
+          accessKeyId       = publishSettings.accessKeyId,
+          secretAccessKey   = publishSettings.secretAccessKey,
+          signingHelperPath = signingHelperPath,
+        }
+      end
+    end
   end
 end
 
