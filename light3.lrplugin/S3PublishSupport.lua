@@ -15,6 +15,36 @@ local S3Upload = require 'S3Upload'
 local signingHelperPath = LrPathUtils.child(_PLUGIN.path, 'light3-sign')
 
 -- ---------------------------------------------------------------------------
+-- Filename helpers
+-- ---------------------------------------------------------------------------
+
+-- Pad a number to at least `width` digits with leading zeros
+local function zeroPad(n, width)
+  local s = tostring(n)
+  while #s < width do s = '0' .. s end
+  return s
+end
+
+-- Build the S3 filename based on the selected naming scheme.
+-- Schemes:
+--   'original'          →  <original_filename>            (e.g. DSC_0042.jpg)
+--   'sequence_collection' →  <00001>_<CollectionName>.<ext>  (e.g. 00001_Summer.jpg)
+local function buildFilename(scheme, index, total, localPath, collectionName)
+  local ext      = LrPathUtils.extension(localPath)
+  local basename = LrPathUtils.removeExtension(LrPathUtils.leafName(localPath))
+  local dotExt   = (ext and ext ~= '') and ('.' .. ext) or ''
+
+  if scheme == 'sequence_collection' then
+    local width = math.max(5, #tostring(total))
+    local safe  = (collectionName ~= '') and collectionName or 'photo'
+    return zeroPad(index, width) .. '_' .. safe .. dotExt
+  end
+
+  -- default: original filename
+  return basename .. dotExt
+end
+
+-- ---------------------------------------------------------------------------
 -- Settings UI
 -- ---------------------------------------------------------------------------
 
@@ -87,6 +117,34 @@ local function sectionsForTopOfDialog(f, propertyTable)
           },
         },
 
+        -- File naming
+        f:separator { fill_horizontal = 1 },
+        f:row {
+          f:static_text { title = 'File naming', width = 120 },
+          f:popup_menu {
+            value = bind 'fileNaming',
+            items = {
+              { title = 'Original filename',              value = 'original' },
+              { title = 'Sequence — Collection name',     value = 'sequence_collection' },
+            },
+          },
+        },
+        f:row {
+          f:static_text { title = '', width = 120 },
+          f:static_text {
+            title = bind {
+              key = 'fileNaming',
+              transform = function(v)
+                if v == 'sequence_collection' then
+                  return 'e.g.  00001_Summer.jpg'
+                end
+                return 'e.g.  DSC_0042.jpg'
+              end,
+            },
+            text_color = LrColor(0.5, 0.5, 0.5),
+          },
+        },
+
       },
     },
   }
@@ -133,17 +191,18 @@ local function processRenderedPhotos(functionContext, exportContext)
 
   local bucket     = LrStringUtils.trimWhitespace(exportSettings.bucket)
   local keyPrefix  = LrStringUtils.trimWhitespace(exportSettings.keyPrefix or '')
+  local fileNaming = exportSettings.fileNaming or 'original'
   -- Normalise prefix: ensure trailing slash if non-empty
   if keyPrefix ~= '' and keyPrefix:sub(-1) ~= '/' then
     keyPrefix = keyPrefix .. '/'
   end
 
-  -- Determine collection name for sub-prefix (only in publish context)
+  -- Determine collection name (used both for sub-prefix and file naming)
   local collectionName = ''
   local pubCollection  = exportContext.publishedCollection
   if pubCollection then
     collectionName = pubCollection:getName()
-    -- sanitise for use as path segment
+    -- sanitise for use as path segment / filename part
     collectionName = collectionName:gsub('[^%w%-_]', '_')
     if collectionName ~= '' then
       keyPrefix = keyPrefix .. collectionName .. '/'
@@ -158,7 +217,7 @@ local function processRenderedPhotos(functionContext, exportContext)
 
     if success then
       local localPath = pathOrMessage
-      local filename  = LrPathUtils.leafName(localPath)
+      local filename  = buildFilename(fileNaming, i, nPhotos, localPath, collectionName)
       local key       = keyPrefix .. filename
 
       progressScope:setCaption('Uploading ' .. filename)
@@ -175,7 +234,6 @@ local function processRenderedPhotos(functionContext, exportContext)
       }
 
       if uploadOk then
-        -- Record the remote ID so Lightroom tracks publish state
         rendition:recordPublishedPhotoId(key)
         rendition:recordPublishedPhotoUrl(
           exportSettings.endpoint .. '/' .. bucket .. '/' .. key
@@ -236,6 +294,7 @@ return {
     { key = 'accessKeyId',     default = '' },
     { key = 'secretAccessKey', default = '' },
     { key = 'keyPrefix',       default = '' },
+    { key = 'fileNaming',      default = 'original' },
   },
 
   -- Core publish callbacks
