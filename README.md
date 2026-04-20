@@ -19,11 +19,11 @@ Lightroom (Lua plugin)
   │
   │  calls
   ▼
-signing-helper/sign.js   ← Node.js script on your Mac
+light3.lrplugin/light3-sign   ← signing helper bundled in the plugin
   │
   │  returns presigned URL (already signed, no auth headers needed)
   ▼
-S3-compatible bucket     ← plain HTTP PUT, no credentials in Lua
+S3-compatible bucket          ← plain HTTP PUT via curl, no credentials in Lua
 ```
 
 The signing helper runs locally — your credentials never leave your machine.
@@ -33,7 +33,7 @@ The signing helper runs locally — your credentials never leave your machine.
 ## Requirements
 
 - **Lightroom Classic** 6 or later
-- **Node.js** 18 or later (for the signing helper)
+- **Node.js** 18 or later
 - An S3-compatible bucket (Cloudflare R2, AWS S3, etc.)
 
 ---
@@ -47,25 +47,21 @@ git clone https://github.com/thkleinert/Light3.git
 cd Light3
 ```
 
-### 2. Install the signing helper
+### 2. Build and install the signing helper
 
 ```bash
 cd signing-helper
 npm install
+npm run install-local
 ```
 
-Make the script executable and optionally link it globally:
-
-```bash
-chmod +x sign.js
-npm link          # creates /usr/local/bin/light3-sign
-```
+`install-local` creates a `light3-sign` script inside `light3.lrplugin/` and in your Lightroom Modules directory. The plugin finds it automatically — no path configuration needed.
 
 Verify it works:
 
 ```bash
 echo '{"endpoint":"https://example.com","bucket":"test","region":"auto","accessKeyId":"key","secretAccessKey":"secret","key":"photo.jpg","method":"PUT"}' \
-  | node sign.js
+  | ../light3.lrplugin/light3-sign
 # → prints a presigned URL
 ```
 
@@ -95,7 +91,7 @@ Restart Lightroom after installing.
 ## Setting up a Publish Service
 
 1. Open the **Library** module.
-2. In the **Publish Services** panel (left sidebar), find **Light3 (S3)** and click **Set Up…**
+2. In the **Publish Services** panel (left sidebar), find **Light3** and click **Set Up…**
 3. Fill in the connection settings (see table below).
 4. Click **Save**.
 
@@ -107,28 +103,46 @@ Restart Lightroom after installing.
 | Access Key ID | S3 access key | `abc123def456` |
 | Secret Access Key | S3 secret key | (hidden) |
 | Key prefix | Optional path prefix inside the bucket | `galleries/` |
-| Signing helper | Full path to `light3-sign` or `sign.js` | `/usr/local/bin/light3-sign` |
+| File naming | Template for S3 filenames (see below) | `<sequence>_<collection>` |
 
 ---
 
 ## Publishing photos
 
-1. In the Publish Services panel, right-click your Light3 service → **Create Published Collection**.
-2. Name the collection (e.g. `Familie Maier 2026`). This name becomes a path segment in the bucket.
-3. Drag photos into the collection.
-4. Click **Publish**.
+### Collections and collection sets
 
-Photos are uploaded to:
+Create collections and optionally group them in collection sets. Light3 mirrors the full hierarchy as S3 path segments:
+
 ```
-<bucket>/<prefix><collection-name>/<filename>
+<bucket>/<prefix>/<CollectionSet>/.../<Collection>/<filename>
 ```
 
-For example, with prefix `galleries/` and collection `Familie Maier 2026`:
+For example, with prefix `galleries/`, collection set `Weddings`, and collection `Smith 2026`:
+
 ```
-my-photos/galleries/Familie_Maier_2026/IMG_1234.jpg
+my-photos/galleries/Weddings/Smith_2026/00001_Smith_2026.jpg
 ```
 
-(Spaces and special characters in collection names are replaced with `_`.)
+### File naming
+
+The **File naming** field in the service settings is a free-form template. Click the token buttons to insert:
+
+| Token | Resolves to |
+|---|---|
+| `<file>` | Original filename without extension (default) |
+| `<sequence>` | Zero-padded position in the publish run, e.g. `00001` |
+| `<collection>` | Sanitised collection name |
+
+Examples:
+- `<file>` → `DSC_0042.jpg`
+- `<sequence>_<collection>` → `00001_Smith_2026.jpg`
+- `<sequence>_<file>` → `00001_DSC_0042.jpg`
+
+The file extension is always appended automatically.
+
+### Custom sort order
+
+Photos within a collection can be reordered by drag-and-drop in Lightroom. Light3 respects this order — combined with the `<sequence>` token, the upload sequence matches your Lightroom ordering exactly.
 
 ### Re-publishing
 
@@ -147,8 +161,6 @@ Removing a photo from a published collection and clicking **Publish** deletes th
 1. In the Cloudflare dashboard, go to **R2 → your bucket → Settings → S3 Auth**.
 2. Create an **API token** with *Object Read & Write* permissions.
 3. Note your **Account ID** (visible in the R2 overview page).
-
-Settings:
 
 | Field | Value |
 |---|---|
@@ -176,8 +188,6 @@ Settings:
 
 2. Create access keys for that user.
 
-Settings:
-
 | Field | Value |
 |---|---|
 | Endpoint URL | `https://s3.<region>.amazonaws.com` |
@@ -189,8 +199,6 @@ Settings:
 
 1. In B2, create an **Application Key** with read/write access to your bucket.
 2. Note the S3-compatible endpoint shown in the bucket details.
-
-Settings:
 
 | Field | Value |
 |---|---|
@@ -208,12 +216,15 @@ Light3/
 ├── light3.lrplugin/
 │   ├── Info.lua                # Plugin manifest
 │   ├── S3PublishSupport.lua    # Publish service UI and callbacks
-│   └── S3Upload.lua            # Upload/delete via presigned URLs
+│   ├── S3Upload.lua            # Upload/delete via presigned URLs + curl
+│   ├── S3_small.png            # Plugin icon
+│   └── light3-sign             # Signing helper (built locally, not in git)
 └── signing-helper/
-    ├── sign.js                 # Presigned URL generator
+    ├── sign.js                 # Presigned URL generator (Node.js / ESM)
+    ├── dev-install.sh          # Builds and installs light3-sign locally
     ├── package.json
     └── test/
-        ├── sign.test.js        # Unit tests for sign.js
+        ├── sign.test.js        # Unit tests
         └── integration.test.js # Integration test (needs real credentials)
 ```
 
@@ -221,27 +232,20 @@ Light3/
 
 ## Troubleshooting
 
-**"No signing helper configured"**
-→ Set the **Signing helper** field in the publish service settings to the full path of `light3-sign` (or `node /path/to/sign.js`).
-
-**"Signing helper failed (exit 1)"**
-→ Run the helper manually to see the error:
-```bash
-echo '{"endpoint":"...","bucket":"...","region":"auto","accessKeyId":"...","secretAccessKey":"...","key":"test.jpg","method":"PUT"}' \
-  | /usr/local/bin/light3-sign
-```
+**"Signing helper failed (exit …)"**
+→ Run `npm run install-local` in `signing-helper/` to rebuild and redeploy the helper, then reload the plugin in Lightroom.
 
 **HTTP 403 on upload**
-→ The presigned URL was generated successfully but the bucket rejected the request. Check:
+→ The presigned URL was generated but the bucket rejected it. Check:
 - Credentials have write permission on the bucket
-- The endpoint URL is correct (no trailing slash)
+- Endpoint URL is correct (no trailing slash)
 - For R2: the S3-compatible API is enabled on the bucket
 
 **HTTP 404 on upload**
-→ The bucket does not exist or the endpoint is wrong.
+→ The bucket does not exist or the endpoint URL is wrong.
 
 **Photos keep showing as "modified" after publish**
-→ Lightroom uses the returned `photoId` to track publish state. This is the S3 key. If the key prefix or collection name changes between publishes, Lightroom loses track. Avoid renaming collections after the first publish.
+→ Lightroom tracks publish state via the S3 key. If the key prefix, collection name, or file naming template changes between publishes, Lightroom loses track of already-published photos. Avoid changing these settings after the first publish.
 
 ---
 
@@ -259,8 +263,17 @@ npm test
 After editing `.lua` files:
 **File → Plug-in Manager → select Light3 → Reload Plug-in**
 
-No build step is required.
+No Lua build step is required.
+
+### Rebuilding the signing helper
+
+```bash
+cd signing-helper
+npm run install-local
+```
+
+This rebuilds `light3-sign` and copies it to both `light3.lrplugin/` and your Lightroom Modules directory.
 
 ### Contributing
 
-Pull requests welcome. Keep the signing helper dependency-light (only `@aws-sdk` packages) and the Lua code compatible with Lightroom Classic SDK 6+.
+Pull requests welcome. Keep the signing helper dependency-light (only `@aws-sdk` packages) and the Lua code compatible with Lightroom Classic SDK 5+.
