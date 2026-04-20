@@ -24,19 +24,12 @@ local signingHelperPath = LrPathUtils.child(_PLUGIN.path, 'light3-sign')
 -- (i.e. the publish service root).
 local function collectionSetPath(collection)
   local parts = {}
-  local node = collection
+  local node  = collection
 
   while true do
-    -- Move up one level
-    local ok, parent = pcall(function() return node:getParent() end)
-    if not ok or parent == nil then break end
-
-    -- A node is a collection set (not the service root) only if it has a
-    -- parent of its own. Check that before including its name.
-    local ok2, grandparent = pcall(function() return parent:getParent() end)
-    if not ok2 or grandparent == nil then break end
-
-    local name = (parent:getName() or ''):gsub('[^%w%-_ ]', '_')
+    local parent = node:getParent()
+    if parent == nil or parent:type() ~= 'LrPublishedCollectionSet' then break end
+    local name = parent:getName():gsub('[^%w%-_ ]', '_')
     if name ~= '' then
       table.insert(parts, 1, name)
     end
