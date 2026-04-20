@@ -216,6 +216,7 @@ end
 return {
 
   supportsIncrementalPublish = 'only',
+  supportsCustomSortOrder    = true,
   small_icon                 = 'S3_small.png',
 
   -- Metadata
