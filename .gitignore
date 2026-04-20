@@ -2,6 +2,9 @@
 signing-helper/node_modules/
 signing-helper/dist/
 
+# Bundled signing helper binary (built locally via `cd signing-helper && npm run install-local`)
+light3.lrplugin/light3-sign
+
 # Compiled Lua sources
 luac.out
 
