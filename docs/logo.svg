@@ -5,10 +5,10 @@
       <stop offset="100%" stop-color="#9d8fff"/>
     </linearGradient>
   </defs>
-  <!-- Rounded square background -->
-  <rect width="40" height="40" rx="9" fill="url(#bg)"/>
+  <!-- Rounded square background with 4px padding on all sides -->
+  <rect x="4" y="4" width="32" height="32" rx="7" fill="url(#bg)"/>
   <!-- "L" stroke -->
-  <path d="M10 10 L10 28 L18 28" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M12 12 L12 26 L19 26" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
   <!-- "3" shape -->
-  <path d="M23 12 L30 12 L25 19 C28 19 31 21 31 24.5 C31 28 28 30 25 30 C22.5 30 21 28.5 20.5 27" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M22 13 L28 13 L24 19 C26.5 19 29 21 29 23.5 C29 26.5 26.5 28 24 28 C22 28 20.5 26.8 20 25.5" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>
