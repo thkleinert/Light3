@@ -65,12 +65,19 @@
       height: 56px;
     }
     .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       font-weight: 600;
       font-size: 1.05rem;
       letter-spacing: -0.01em;
       color: var(--text);
     }
-    .nav-logo span { color: var(--accent-hi); }
+    .nav-logo img {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+    }
     .nav-links { display: flex; gap: 28px; }
     .nav-links a {
       font-size: 0.875rem;
@@ -488,7 +495,10 @@
 <!-- ── Nav ──────────────────────────────────────────────────────────────── -->
 <nav>
   <div class="wrap">
-    <span class="nav-logo">Light<span>3</span></span>
+    <a class="nav-logo" href="#">
+      <img src="logo.svg" alt="Light3" />
+      Light3
+    </a>
     <div class="nav-links">
       <a href="#how-it-works">How it works</a>
       <a href="#features">Features</a>
