@@ -12,10 +12,10 @@ return {
   LrPluginName         = 'Light3',
 
   VERSION = {
-    major  = 0,
-    minor  = 1,
-    revision = 0,
-    display = '0.1.0',
+    major    = 1,  -- x-release-please-major
+    minor    = 1,  -- x-release-please-minor
+    revision = 0,  -- x-release-please-patch
+    display  = '1.1.0',  -- x-release-please-version
   },
 
   LrExportServiceProvider = {

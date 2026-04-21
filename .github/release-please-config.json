@@ -1,0 +1,9 @@
+{
+  "release-type": "simple",
+  "extra-files": [
+    {
+      "type": "generic",
+      "path": "light3.lrplugin/Info.lua"
+    }
+  ]
+}
