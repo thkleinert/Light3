@@ -3,6 +3,7 @@ S3PublishSupport.lua
 Publish service provider for Light3 — handles Lightroom publish lifecycle.
 ------------------------------------------------------------------------------]]
 
+local LrApplication   = import 'LrApplication'
 local LrColor         = import 'LrColor'
 local LrErrors        = import 'LrErrors'
 local LrPathUtils     = import 'LrPathUtils'
@@ -13,6 +14,20 @@ local S3Upload = require 'S3Upload'
 
 -- Path to the signing helper bundled inside the plugin folder
 local signingHelperPath = LrPathUtils.child(_PLUGIN.path, 'light3-sign')
+
+-- ---------------------------------------------------------------------------
+-- Module-level state: passed from processRenderedPhotos to
+-- imposeSortOrderOnPublishedCollection (called by LR after the publish run).
+-- ---------------------------------------------------------------------------
+
+local pendingOrder = nil
+-- When set, has the shape:
+--   publishSettings  table   — export settings (endpoint, bucket, …)
+--   collectionName   string  — sanitised collection name
+--   prefix           string  — S3 key prefix including trailing slash
+--   renderedKeys     table   — S3 keys in render-loop order (correct LR order)
+--   keyRenames       table   — { [oldKey] = newKey } for re-keyed photos
+--   isFullPublish    bool    — true when every photo in the collection was rendered
 
 -- ---------------------------------------------------------------------------
 -- Collection path helper
@@ -55,23 +70,25 @@ end
 --   <sequence>    zero-padded position in the current publish run
 --   <collection>  sanitised collection name
 --   <file>        original filename without extension
-local function applyTemplate(template, index, total, basename, collectionName)
+--   <uuid>        Lightroom's permanent internal photo UUID (stable across reorders)
+local function applyTemplate(template, index, total, basename, collectionName, uuid)
   local width  = math.max(5, #tostring(total))
   local safe   = (collectionName and collectionName ~= '') and collectionName or 'photo'
   local result = template
   result = result:gsub('<sequence>',   zeroPad(index, width))
   result = result:gsub('<collection>', safe)
   result = result:gsub('<file>',       basename)
+  result = result:gsub('<uuid>',       uuid or 'nouuid')
   return result
 end
 
 -- Build the final S3 filename from settings + context
-local function buildFilename(template, index, total, localPath, collectionName)
+local function buildFilename(template, index, total, localPath, collectionName, uuid)
   local ext      = LrPathUtils.extension(localPath)
   local basename = LrPathUtils.removeExtension(LrPathUtils.leafName(localPath))
   local dotExt   = (ext and ext ~= '') and ('.' .. ext) or ''
   local tpl      = (template and template ~= '') and template or '<file>'
-  return applyTemplate(tpl, index, total, basename, collectionName) .. dotExt
+  return applyTemplate(tpl, index, total, basename, collectionName, uuid) .. dotExt
 end
 
 -- ---------------------------------------------------------------------------
@@ -177,11 +194,15 @@ local function sectionsForTopOfDialog(f, propertyTable)
             title  = '<file>',
             action = function() insertToken('<file>') end,
           },
+          f:push_button {
+            title  = '<uuid>',
+            action = function() insertToken('<uuid>') end,
+          },
         },
         f:row {
           f:static_text { title = '', width = 120 },
           f:static_text {
-            title      = '<sequence> = 00001   <collection> = GalleryName   <file> = DSC_0042',
+            title      = '<sequence> = 00001   <collection> = GalleryName   <file> = DSC_0042   <uuid> = 4FE7F02E…',
             text_color = LrColor(0.5, 0.5, 0.5),
             fill_horizontal = 1,
           },
@@ -258,6 +279,17 @@ local function processRenderedPhotos(functionContext, exportContext)
     end
   end
 
+  -- Determine full vs partial publish.
+  -- getPublishedPhotos() counts photos already tracked by this publish service.
+  -- On a first publish it returns 0 (< nPhotos) → isFullPublish = true, which is
+  -- correct: the render loop covers everything.
+  local alreadyPublished = pubCollection and #(pubCollection:getPublishedPhotos() or {}) or 0
+  local isFullPublish    = (nPhotos >= alreadyPublished)
+
+  -- Collect render-loop order and key renames for imposeSortOrderOnPublishedCollection
+  local renderedKeys = {}
+  local keyRenames   = {}   -- { [oldKey] = newKey } for photos whose key changed
+
   for i, rendition in exportSession:renditions { stopIfCanceled = true } do
     progressScope:setPortionComplete(i - 1, nPhotos)
 
@@ -266,8 +298,17 @@ local function processRenderedPhotos(functionContext, exportContext)
 
     if success then
       local localPath = pathOrMessage
-      local filename  = buildFilename(fileNamingTemplate, i, nPhotos, localPath, collectionName)
+      local uuid      = (rendition.photo and rendition.photo:getRawMetadata('uuid')) or 'nouuid'
+      local filename  = buildFilename(fileNamingTemplate, i, nPhotos, localPath, collectionName, uuid)
       local key       = keyPrefix .. filename
+
+      -- Track if this photo had a different key in the previous publish
+      local oldKey = rendition.publishedPhotoId
+      if oldKey and oldKey ~= '' and oldKey ~= key then
+        keyRenames[oldKey] = key
+      end
+
+      table.insert(renderedKeys, key)
 
       progressScope:setCaption('Uploading ' .. filename)
 
@@ -295,48 +336,121 @@ local function processRenderedPhotos(functionContext, exportContext)
     end
   end
 
-  -- Write order.json with the full ordered list of all published photos in the collection.
-  -- Done after the upload loop so newly published photos are included.
-  if pubCollection and not progressScope:isCanceled() then
-    progressScope:setCaption('Updating order.json…')
-
-    local publishedPhotos = pubCollection:getPublishedPhotos()
-    local keys = {}
-    for _, pubPhoto in ipairs(publishedPhotos or {}) do
-      local remoteId = pubPhoto:getRemoteId()
-      if remoteId and remoteId ~= '' then
-        table.insert(keys, '"' .. remoteId:gsub('\\', '\\\\'):gsub('"', '\\"') .. '"')
-      end
-    end
-
-    local orderKey = keyPrefix .. 'order.json'
-    local json = string.format(
-      '{"collection":"%s","prefix":"%s","photos":[%s]}',
-      collectionName:gsub('\\', '\\\\'):gsub('"', '\\"'),
-      keyPrefix:gsub('\\', '\\\\'):gsub('"', '\\"'),
-      table.concat(keys, ',')
-    )
-
-    local putOk, putErr = S3Upload.putContent {
-      content           = json,
-      key               = orderKey,
-      endpoint          = exportSettings.endpoint,
-      bucket            = bucket,
-      region            = exportSettings.region or 'auto',
-      accessKeyId       = exportSettings.accessKeyId,
-      secretAccessKey   = exportSettings.secretAccessKey,
-      signingHelperPath = signingHelperPath,
+  -- Store order state for imposeSortOrderOnPublishedCollection, which Lightroom
+  -- calls after this function with the collection still intact.
+  if not progressScope:isCanceled() and #renderedKeys > 0 then
+    pendingOrder = {
+      publishSettings = exportSettings,
+      collectionName  = collectionName,
+      prefix          = keyPrefix,
+      renderedKeys    = renderedKeys,
+      keyRenames      = keyRenames,
+      isFullPublish   = isFullPublish,
     }
-
-    if not putOk then
-      -- Non-fatal: log to Lightroom but don't abort the publish
-      LrErrors.throwUserError(string.format(
-        'order.json write failed (%s): %s', orderKey, tostring(putErr)
-      ))
-    end
   end
 
   progressScope:done()
+end
+
+-- ---------------------------------------------------------------------------
+-- Write order.json from an ordered list of S3 keys
+-- ---------------------------------------------------------------------------
+
+local function writeOrderJson(publishSettings, orderedKeys, collectionName)
+  if not orderedKeys or #orderedKeys == 0 then return end
+
+  local prefix = orderedKeys[1]:match('^(.*/)') or ''
+
+  local keyStrings = {}
+  for _, k in ipairs(orderedKeys) do
+    table.insert(keyStrings, '"' .. k:gsub('\\', '\\\\'):gsub('"', '\\"') .. '"')
+  end
+
+  local json = string.format(
+    '{"collection":"%s","prefix":"%s","photos":[%s]}',
+    (collectionName or ''):gsub('\\', '\\\\'):gsub('"', '\\"'),
+    prefix:gsub('\\', '\\\\'):gsub('"', '\\"'),
+    table.concat(keyStrings, ',')
+  )
+
+  S3Upload.putContent {
+    content           = json,
+    key               = prefix .. 'order.json',
+    endpoint          = publishSettings.endpoint,
+    bucket            = publishSettings.bucket,
+    region            = publishSettings.region or 'auto',
+    accessKeyId       = publishSettings.accessKeyId,
+    secretAccessKey   = publishSettings.secretAccessKey,
+    signingHelperPath = signingHelperPath,
+  }
+end
+
+-- ---------------------------------------------------------------------------
+-- Impose sort order (called by Lightroom after every publish run)
+-- ---------------------------------------------------------------------------
+
+local function imposeSortOrderOnPublishedCollection(publishSettings, info)
+  -- Nothing to do if processRenderedPhotos didn't run (e.g. cancelled early)
+  if not pendingOrder then return end
+
+  local order  = pendingOrder
+  pendingOrder = nil   -- consume the pending state
+
+  local finalKeys
+
+  if order.isFullPublish then
+    -- The render loop covered all photos in the collection → its order is
+    -- the definitive Lightroom custom sort order.
+    finalKeys = order.renderedKeys
+  else
+    -- Partial publish: fetch the existing order.json and patch it.
+    local orderJson = S3Upload.getContent {
+      key               = order.prefix .. 'order.json',
+      endpoint          = order.publishSettings.endpoint,
+      bucket            = order.publishSettings.bucket,
+      region            = order.publishSettings.region or 'auto',
+      accessKeyId       = order.publishSettings.accessKeyId,
+      secretAccessKey   = order.publishSettings.secretAccessKey,
+      signingHelperPath = signingHelperPath,
+    }
+
+    if not orderJson then
+      -- No existing order.json — fall back to render loop order
+      finalKeys = order.renderedKeys
+    else
+      -- Parse existing photo list
+      local existingKeys = {}
+      local photosJson   = orderJson:match('"photos"%s*:%s*%[(.-)%]')
+      if photosJson then
+        for k in photosJson:gmatch('"([^"]+)"') do
+          table.insert(existingKeys, k)
+        end
+      end
+
+      -- Apply any key renames (e.g. sequence numbers changed) and deduplicate
+      local renames  = order.keyRenames
+      local finalSet = {}
+      finalKeys = {}
+
+      for _, k in ipairs(existingKeys) do
+        local newK = renames[k] or k
+        if not finalSet[newK] then
+          finalSet[newK] = true
+          table.insert(finalKeys, newK)
+        end
+      end
+
+      -- Append keys for photos that are new to the collection (no entry yet)
+      for _, k in ipairs(order.renderedKeys) do
+        if not finalSet[k] then
+          finalSet[k] = true
+          table.insert(finalKeys, k)
+        end
+      end
+    end
+  end
+
+  writeOrderJson(order.publishSettings, finalKeys, order.collectionName)
 end
 
 -- ---------------------------------------------------------------------------
@@ -359,23 +473,12 @@ local function deletePhotosFromPublishedCollection(functionContext, publishSetti
     }
   end
 
-  -- Refresh order.json: remove deleted keys, preserve order of remaining photos.
-  -- Derive the collection prefix from the first deleted key (strip the filename).
+  -- Refresh order.json by reading existing file, filtering out deleted keys.
   local sampleKey = arrayOfPhotoIds[1]
   if sampleKey then
-    local prefix = sampleKey:match('^(.*/)') or ''
-
-    -- Collect remaining published photo keys from S3 publish records.
-    -- We don't have direct access to the collection here, so we read the
-    -- existing order.json, filter out deleted keys, and rewrite it.
-    -- If order.json doesn't exist yet this is a no-op (putContent will create it).
-    local remainingKeys = {}
-    -- Re-read existing order from the collection via the published IDs we still know.
-    -- Since arrayOfPhotoIds are the ones being removed, build the surviving list
-    -- by fetching the current order.json and filtering.
-    local orderKey  = prefix .. 'order.json'
+    local prefix    = sampleKey:match('^(.*/)') or ''
     local orderJson = S3Upload.getContent {
-      key               = orderKey,
+      key               = prefix .. 'order.json',
       endpoint          = publishSettings.endpoint,
       bucket            = publishSettings.bucket,
       region            = publishSettings.region or 'auto',
@@ -385,32 +488,17 @@ local function deletePhotosFromPublishedCollection(functionContext, publishSetti
     }
 
     if orderJson then
-      -- Parse the photos array from the existing JSON (simple pattern match)
-      local photosJson = orderJson:match('"photos"%s*:%s*%[(.-)%]')
+      local remainingKeys  = {}
+      local collectionName = orderJson:match('"collection"%s*:%s*"([^"]+)"') or ''
+      local photosJson     = orderJson:match('"photos"%s*:%s*%[(.-)%]')
       if photosJson then
         for key in photosJson:gmatch('"([^"]+)"') do
           if not deleted[key] then
-            table.insert(remainingKeys, '"' .. key:gsub('\\', '\\\\'):gsub('"', '\\"') .. '"')
+            table.insert(remainingKeys, key)
           end
         end
-
-        local collectionName = orderJson:match('"collection"%s*:%s*"([^"]+)"') or ''
-        local json = string.format(
-          '{"collection":"%s","prefix":"%s","photos":[%s]}',
-          collectionName, prefix:gsub('\\', '\\\\'):gsub('"', '\\"'),
-          table.concat(remainingKeys, ',')
-        )
-        S3Upload.putContent {
-          content           = json,
-          key               = orderKey,
-          endpoint          = publishSettings.endpoint,
-          bucket            = publishSettings.bucket,
-          region            = publishSettings.region or 'auto',
-          accessKeyId       = publishSettings.accessKeyId,
-          secretAccessKey   = publishSettings.secretAccessKey,
-          signingHelperPath = signingHelperPath,
-        }
       end
+      writeOrderJson(publishSettings, remainingKeys, collectionName)
     end
   end
 end
@@ -446,8 +534,9 @@ return {
   },
 
   -- Core publish callbacks
-  processRenderedPhotos               = processRenderedPhotos,
-  deletePhotosFromPublishedCollection = deletePhotosFromPublishedCollection,
+  processRenderedPhotos                    = processRenderedPhotos,
+  deletePhotosFromPublishedCollection      = deletePhotosFromPublishedCollection,
+  imposeSortOrderOnPublishedCollection     = imposeSortOrderOnPublishedCollection,
 
   -- Optional: called when a collection is renamed — update the prefix if needed
   renamePublishedCollection = function(publishSettings, info)

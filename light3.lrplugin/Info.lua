@@ -9,7 +9,7 @@ return {
   LrSdkMinimumVersion  = 5.0,
 
   LrToolkitIdentifier  = 'com.thkleinert.light3',
-  LrPluginName         = 'Light3 — S3 Publisher',
+  LrPluginName         = 'Light3',
 
   VERSION = {
     major  = 0,
@@ -21,6 +21,13 @@ return {
   LrExportServiceProvider = {
     title = 'Light3',
     file  = 'S3PublishSupport.lua',
+  },
+
+  LrLibraryMenuItems = {
+    {
+      title = 'Sync order',
+      file  = 'SyncOrder.lua',
+    },
   },
 
 }
