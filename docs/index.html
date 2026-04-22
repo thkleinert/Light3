@@ -481,6 +481,85 @@
     .footer-links a { font-size: 0.875rem; color: var(--muted); }
     .footer-links a:hover { color: var(--text); text-decoration: none; }
 
+    /* ── Static site workflow ────────────────────────────────────────────── */
+    .workflow {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 2px;
+      background: var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 48px;
+    }
+    .workflow-step {
+      background: var(--bg-card);
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+    }
+    .workflow-step-label {
+      font-size: 0.72rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+    }
+    .workflow-step-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+    .workflow-step-desc {
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .workflow-arrow {
+      position: absolute;
+      right: -10px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 1;
+      width: 20px;
+      height: 20px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent-hi);
+      font-size: 0.7rem;
+    }
+    .ssg-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+    }
+    .ssg-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      transition: border-color 0.2s;
+    }
+    .ssg-card:hover { border-color: rgba(124,106,255,0.3); }
+    .ssg-card-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+      letter-spacing: -0.01em;
+    }
+    .ssg-card-desc {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
     /* ── Responsive ───────────────────────────────────────────────────────── */
     @media (max-width: 640px) {
       .nav-links { display: none; }
@@ -488,6 +567,7 @@
       section { padding: 64px 0; }
       .install-step { grid-template-columns: 1fr; }
       .install-num { display: none; }
+      .workflow-arrow { display: none; }
       footer .wrap { flex-direction: column; align-items: flex-start; }
     }
   </style>
@@ -505,6 +585,7 @@
       <a href="#how-it-works">How it works</a>
       <a href="#features">Features</a>
       <a href="#install">Install</a>
+      <a href="#static-sites">Static sites</a>
       <a href="#providers">Providers</a>
       <a href="https://github.com/thkleinert/Light3">GitHub ↗</a>
     </div>
@@ -517,8 +598,9 @@
     <div class="badge">Free &amp; open source</div>
     <h1>Publish your photos to<br /><em>S3-compatible storage</em></h1>
     <p class="hero-sub">
-      A Lightroom Classic publish plugin that uploads your catalog directly to
-      Cloudflare R2, AWS S3, Backblaze B2, or any S3-compatible bucket.
+      A Lightroom Classic publish plugin that turns your catalog into the
+      image backend for a static portfolio or gallery website — built with
+      Hugo, Astro, Eleventy, or any static site generator.
       No middleman, no subscription.
     </p>
     <div class="hero-actions">
@@ -640,6 +722,79 @@
         Downstream tools (web galleries, slideshow generators) can consume this file without
         knowing anything about Lightroom's internals.
       </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Static site workflow ──────────────────────────────────────────────── -->
+<section id="static-sites">
+  <div class="wrap">
+    <p class="section-label">Static site workflow</p>
+    <h2>Your Lightroom catalog,<br />powering a real website</h2>
+    <p class="section-sub">
+      Light3 is the missing link between Lightroom's curation tools and
+      static site generators. Curate in Lightroom, publish to S3, let your
+      CI pipeline do the rest.
+    </p>
+
+    <div class="workflow">
+      <div class="workflow-step">
+        <span class="workflow-step-label">Step 1</span>
+        <span class="workflow-step-title">Curate in Lightroom</span>
+        <span class="workflow-step-desc">Organise photos into published collections. Drag to reorder. Rate and cull as usual.</span>
+        <span class="workflow-arrow">→</span>
+      </div>
+      <div class="workflow-step">
+        <span class="workflow-step-label">Step 2</span>
+        <span class="workflow-step-title">Publish to S3</span>
+        <span class="workflow-step-desc">Click Publish. Light3 uploads only changed photos and writes an <code>order.json</code> sidecar per collection.</span>
+        <span class="workflow-arrow">→</span>
+      </div>
+      <div class="workflow-step">
+        <span class="workflow-step-label">Step 3</span>
+        <span class="workflow-step-title">CI reads from S3</span>
+        <span class="workflow-step-desc">Your build pipeline (GitHub Actions, Cloudflare Pages, Netlify…) pulls the images and <code>order.json</code> files from the bucket.</span>
+        <span class="workflow-arrow">→</span>
+      </div>
+      <div class="workflow-step">
+        <span class="workflow-step-label">Step 4</span>
+        <span class="workflow-step-title">SSG builds the site</span>
+        <span class="workflow-step-desc">Hugo, Astro, or Eleventy processes the images, generates responsive sizes, and renders gallery pages in the exact order you arranged them.</span>
+        <span class="workflow-arrow">→</span>
+      </div>
+      <div class="workflow-step">
+        <span class="workflow-step-label">Step 5</span>
+        <span class="workflow-step-title">Deploy</span>
+        <span class="workflow-step-desc">The finished static site is deployed to Cloudflare Pages, Netlify, GitHub Pages, or any CDN — globally fast, zero server costs.</span>
+      </div>
+    </div>
+
+    <p class="section-label" style="margin-bottom:16px;">Works great with</p>
+    <div class="ssg-grid">
+      <div class="ssg-card">
+        <div class="ssg-card-name">Hugo</div>
+        <div class="ssg-card-desc">Built-in image processing pipelines and fast incremental builds make it a natural fit for large photo galleries.</div>
+      </div>
+      <div class="ssg-card">
+        <div class="ssg-card-name">Astro</div>
+        <div class="ssg-card-desc">Component-based layouts with first-class image optimisation. Great for portfolio sites that mix photos with other content.</div>
+      </div>
+      <div class="ssg-card">
+        <div class="ssg-card-name">Eleventy</div>
+        <div class="ssg-card-desc">Minimal and flexible. Pair with the eleventy-img plugin for responsive image generation from your S3 originals.</div>
+      </div>
+      <div class="ssg-card">
+        <div class="ssg-card-name">Next.js</div>
+        <div class="ssg-card-desc">Static export mode with <code>next/image</code> handles optimisation at build time, giving you a dynamic-feeling site from flat files.</div>
+      </div>
+      <div class="ssg-card">
+        <div class="ssg-card-name">Jekyll</div>
+        <div class="ssg-card-desc">Simple data files and Liquid templates. Drop <code>order.json</code> into <code>_data/</code> and iterate straight over your gallery.</div>
+      </div>
+      <div class="ssg-card">
+        <div class="ssg-card-name">Any SSG</div>
+        <div class="ssg-card-desc"><code>order.json</code> is plain JSON — readable by any build tool, script, or framework without special integrations.</div>
+      </div>
     </div>
   </div>
 </section>
