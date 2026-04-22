@@ -287,24 +287,7 @@
     }
     .step p { font-size: 0.9rem; color: var(--muted); line-height: 1.6; }
 
-    /* ── Architecture diagram ─────────────────────────────────────────────── */
-    .arch {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 36px;
-      margin-top: 48px;
-      font-family: var(--mono);
-      font-size: 0.82rem;
-      color: var(--muted);
-      line-height: 2;
-      overflow-x: auto;
-    }
-    .arch .hl  { color: var(--text); }
-    .arch .acc { color: var(--accent-hi); }
-    .arch .grn { color: var(--green); }
-
-    /* ── Features grid ────────────────────────────────────────────────────── */
+/* ── Features grid ────────────────────────────────────────────────────── */
     .features {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -444,26 +427,7 @@
     .provider-table td:first-child { color: var(--muted); width: 160px; }
     .provider-table tr:last-child td { border-bottom: none; }
 
-    /* ── order.json callout ───────────────────────────────────────────────── */
-    .callout {
-      background: rgba(124,106,255,0.07);
-      border: 1px solid rgba(124,106,255,0.18);
-      border-radius: var(--radius);
-      padding: 28px 32px;
-      margin-top: 40px;
-    }
-    .callout-title {
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--accent-hi);
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .callout p { font-size: 0.875rem; color: var(--muted); line-height: 1.7; }
-
-    /* ── Footer ───────────────────────────────────────────────────────────── */
+/* ── Footer ───────────────────────────────────────────────────────────── */
     footer {
       border-top: 1px solid var(--border);
       padding: 40px 0;
@@ -657,14 +621,6 @@
       </div>
     </div>
 
-    <div class="arch">
-      <span class="hl">Lightroom Classic</span>  <span class="acc">→  light3-sign</span>  <span class="grn">→  S3 bucket</span><br/>
-      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="muted">(presigns URL locally)</span>&nbsp;&nbsp;&nbsp;<span class="muted">(plain HTTPS PUT, no proxy)</span>
-    </div>
-    <p style="margin-top:14px; font-size:0.82rem; color:var(--muted);">
-      Lightroom's Lua scripting has no crypto, so AWS Signature V4 signing is handled by a small bundled helper binary.
-      Your credentials never leave your machine — the helper generates a presigned URL and the plugin uploads directly.
-    </p>
   </div>
 </section>
 
@@ -710,19 +666,6 @@
       </div>
     </div>
 
-    <div class="callout">
-      <div class="callout-title">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M7 6v4M7 4.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        order.json — gallery-ready from day one
-      </div>
-      <p>
-        After every publish, Light3 writes <code>order.json</code> to the collection's S3 prefix.
-        It contains the collection name, the S3 prefix, and the full ordered list of photo keys —
-        exactly as you arranged them by drag-and-drop in Lightroom.
-        Downstream tools (web galleries, slideshow generators) can consume this file without
-        knowing anything about Lightroom's internals.
-      </p>
-    </div>
   </div>
 </section>
 
