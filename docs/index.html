@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Light3 — Lightroom to S3</title>
+  <meta name="description" content="Publish your Lightroom Classic catalog directly to Cloudflare R2, AWS S3, Backblaze B2, or any S3-compatible storage. Free and open source." />
+  <link rel="icon" type="image/svg+xml" href="logo.svg" />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0c0c10;
+      --bg-card:   #13131a;
+      --bg-code:   #0a0a0e;
+      --border:    rgba(255,255,255,0.07);
+      --text:      #e8e8f0;
+      --muted:     #7a7a92;
+      --accent:    #7c6aff;
+      --accent-hi: #a899ff;
+      --green:     #34d399;
+      --font:      'Inter', system-ui, sans-serif;
+      --mono:      'JetBrains Mono', 'Fira Code', monospace;
+      --radius:    12px;
+      --max:       1100px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 16px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--accent-hi); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Layout helpers ───────────────────────────────────────────────────── */
+    .wrap {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ── Nav ──────────────────────────────────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(12,12,16,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    nav .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+    }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 1.05rem;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+    .nav-logo img {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+    }
+    .nav-links { display: flex; gap: 28px; }
+    .nav-links a {
+      font-size: 0.875rem;
+      color: var(--muted);
+      transition: color 0.15s;
+    }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+
+    /* ── Hero ─────────────────────────────────────────────────────────────── */
+    .hero {
+      padding: 112px 0 96px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(124,106,255,0.18) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(124,106,255,0.12);
+      border: 1px solid rgba(124,106,255,0.25);
+      border-radius: 100px;
+      padding: 4px 14px;
+      font-size: 0.8rem;
+      color: var(--accent-hi);
+      margin-bottom: 28px;
+      letter-spacing: 0.01em;
+    }
+    .badge::before {
+      content: '';
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+    }
+
+    h1 {
+      font-size: clamp(2.6rem, 6vw, 4.2rem);
+      font-weight: 600;
+      letter-spacing: -0.04em;
+      line-height: 1.1;
+      margin-bottom: 24px;
+    }
+    h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, var(--accent-hi), #c4b9ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-sub {
+      font-size: 1.2rem;
+      color: var(--muted);
+      max-width: 580px;
+      margin: 0 auto 44px;
+      font-weight: 300;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 13px 26px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.18s;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(124,106,255,0.35);
+    }
+    .btn-primary:hover {
+      background: var(--accent-hi);
+      box-shadow: 0 4px 28px rgba(124,106,255,0.5);
+      transform: translateY(-1px);
+      text-decoration: none;
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover {
+      color: var(--text);
+      border-color: rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.04);
+      text-decoration: none;
+    }
+
+    .hero-note {
+      margin-top: 18px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    #version-tag { color: var(--accent-hi); }
+
+    /* ── Providers strip ──────────────────────────────────────────────────── */
+    .providers {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 22px 0;
+    }
+    .providers .wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .providers-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-right: 6px;
+    }
+    .pill {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 5px 14px;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    /* ── Section titles ───────────────────────────────────────────────────── */
+    section { padding: 96px 0; }
+    section + section { padding-top: 0; }
+
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent-hi);
+      margin-bottom: 12px;
+    }
+    h2 {
+      font-size: clamp(1.7rem, 3.5vw, 2.4rem);
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      margin-bottom: 16px;
+    }
+    .section-sub {
+      font-size: 1.05rem;
+      color: var(--muted);
+      max-width: 520px;
+      margin-bottom: 56px;
+    }
+
+    /* ── How it works ─────────────────────────────────────────────────────── */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 2px;
+      background: var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .step {
+      background: var(--bg-card);
+      padding: 36px 32px;
+    }
+    .step-num {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: rgba(124,106,255,0.12);
+      border: 1px solid rgba(124,106,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent-hi);
+      margin-bottom: 20px;
+    }
+    .step h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+    .step p { font-size: 0.9rem; color: var(--muted); line-height: 1.6; }
+
+/* ── Features grid ────────────────────────────────────────────────────── */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .feature {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      transition: border-color 0.2s;
+    }
+    .feature:hover { border-color: rgba(124,106,255,0.3); }
+    .feature-icon {
+      font-size: 1.4rem;
+      margin-bottom: 14px;
+    }
+    .feature h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      letter-spacing: -0.01em;
+    }
+    .feature p { font-size: 0.875rem; color: var(--muted); line-height: 1.6; }
+
+    /* ── Install ──────────────────────────────────────────────────────────── */
+    .install-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      background: var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .install-step {
+      background: var(--bg-card);
+      padding: 28px 32px;
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    .install-num {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: rgba(52,211,153,0.1);
+      border: 1px solid rgba(52,211,153,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--green);
+      flex-shrink: 0;
+    }
+    .install-step h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      letter-spacing: -0.01em;
+    }
+    .install-step p { font-size: 0.875rem; color: var(--muted); }
+    .install-step p + p { margin-top: 6px; }
+
+    code, .code {
+      font-family: var(--mono);
+      font-size: 0.82em;
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 2px 7px;
+      color: var(--accent-hi);
+    }
+
+    pre {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 22px;
+      overflow-x: auto;
+      color: var(--text);
+      margin-top: 14px;
+      line-height: 1.7;
+    }
+
+    /* ── Provider tabs ────────────────────────────────────────────────────── */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 28px;
+    }
+    .tab {
+      padding: 10px 18px;
+      border-radius: 6px 6px 0 0;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      color: var(--muted);
+      border: none;
+      background: transparent;
+      font-family: var(--font);
+      transition: color 0.15s;
+      margin-bottom: -1px;
+      border-bottom: 2px solid transparent;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active {
+      color: var(--accent-hi);
+      border-bottom-color: var(--accent-hi);
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .provider-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    .provider-table th {
+      text-align: left;
+      padding: 10px 16px;
+      color: var(--muted);
+      font-weight: 500;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid var(--border);
+    }
+    .provider-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .provider-table td:first-child { color: var(--muted); width: 160px; }
+    .provider-table tr:last-child td { border-bottom: none; }
+
+/* ── Footer ───────────────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 0;
+    }
+    footer .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .footer-left { font-size: 0.875rem; color: var(--muted); }
+    .footer-left strong { color: var(--text); }
+    .footer-links { display: flex; gap: 24px; }
+    .footer-links a { font-size: 0.875rem; color: var(--muted); }
+    .footer-links a:hover { color: var(--text); text-decoration: none; }
+
+    /* ── Static site workflow ────────────────────────────────────────────── */
+    .workflow {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 2px;
+      background: var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 48px;
+    }
+    .workflow-step {
+      background: var(--bg-card);
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+    }
+    .workflow-step-label {
+      font-size: 0.72rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+    }
+    .workflow-step-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+    .workflow-step-desc {
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .workflow-arrow {
+      position: absolute;
+      right: -10px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 1;
+      width: 20px;
+      height: 20px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent-hi);
+      font-size: 0.7rem;
+    }
+    .ssg-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+    }
+    .ssg-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      transition: border-color 0.2s;
+    }
+    .ssg-card:hover { border-color: rgba(124,106,255,0.3); }
+    .ssg-card-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+      letter-spacing: -0.01em;
+    }
+    .ssg-card-desc {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* ── Responsive ───────────────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .nav-links { display: none; }
+      .hero { padding: 80px 0 64px; }
+      section { padding: 64px 0; }
+      .install-step { grid-template-columns: 1fr; }
+      .install-num { display: none; }
+      .workflow-arrow { display: none; }
+      footer .wrap { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Nav ──────────────────────────────────────────────────────────────── -->
+<nav>
+  <div class="wrap">
+    <a class="nav-logo" href="#">
+      <img src="logo.svg" alt="Light3" />
+      Light3
+    </a>
+    <div class="nav-links">
+      <a href="#how-it-works">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="#static-sites">Static sites</a>
+      <a href="#providers">Providers</a>
+      <a href="https://github.com/thkleinert/Light3">GitHub ↗</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Hero ─────────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="wrap">
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:28px;">
+      <div class="badge" style="margin-bottom:0;">Free &amp; open source</div>
+      <div class="badge" style="margin-bottom:0;background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.12);color:var(--muted);">Vibe-coded with AI</div>
+    </div>
+    <h1>Publish your photos to<br /><em>S3-compatible storage</em></h1>
+    <p class="hero-sub">
+      A Lightroom Classic publish plugin that turns your catalog into the
+      image backend for a static portfolio or gallery website — built with
+      Hugo, Astro, Eleventy, or any static site generator.
+      No middleman, no subscription.
+    </p>
+    <div class="hero-actions">
+      <a id="download-btn" href="https://github.com/thkleinert/Light3/releases/latest" class="btn btn-primary">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1v9M4 7l4 4 4-4M2 13h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Download
+      </a>
+      <a href="https://github.com/thkleinert/Light3" class="btn btn-ghost">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        View on GitHub
+      </a>
+    </div>
+    <p class="hero-note">Version <span id="version-tag">latest</span> · macOS · Lightroom Classic 6+</p>
+  </div>
+</section>
+
+<!-- ── Providers strip ──────────────────────────────────────────────────── -->
+<div class="providers">
+  <div class="wrap">
+    <span class="providers-label">Works with</span>
+    <span class="pill">Cloudflare R2</span>
+    <span class="pill">AWS S3</span>
+    <span class="pill">Backblaze B2</span>
+    <span class="pill">MinIO</span>
+    <span class="pill">Any S3-compatible storage</span>
+  </div>
+</div>
+
+<!-- ── How it works ─────────────────────────────────────────────────────── -->
+<section id="how-it-works">
+  <div class="wrap">
+    <p class="section-label">How it works</p>
+    <h2>Organize in Lightroom,<br />store anywhere</h2>
+    <p class="section-sub">
+      Light3 adds a Publish Service to Lightroom's library panel.
+      Organize photos into collections, hit Publish — done.
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <h3>Organize</h3>
+        <p>Create published collections and collection sets in Lightroom's library panel, exactly like you already do. Drag photos in, arrange them, rate and cull.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <h3>Publish</h3>
+        <p>Click Publish. Light3 uploads only new or changed photos. Lightroom tracks what's already up-to-date so nothing is re-uploaded unnecessarily.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <h3>Share</h3>
+        <p>Your photos land in the bucket at a predictable path. Light3 also writes an <code>order.json</code> sidecar so any web gallery can display them in the exact order you arranged them.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── Features ─────────────────────────────────────────────────────────── -->
+<section id="features">
+  <div class="wrap">
+    <p class="section-label">Features</p>
+    <h2>Everything you need,<br />nothing you don't</h2>
+    <p class="section-sub">
+      Built for photographers who self-host — not for SaaS platforms that lock in your files.
+    </p>
+
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">🗂️</div>
+        <h3>Collection hierarchy</h3>
+        <p>Collection sets map directly to S3 path segments. <code>Weddings/Smith 2026/</code> in Lightroom becomes <code>galleries/Weddings/Smith_2026/</code> in your bucket.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔢</div>
+        <h3>Flexible file naming</h3>
+        <p>Templates with <code>&lt;sequence&gt;</code>, <code>&lt;collection&gt;</code>, <code>&lt;file&gt;</code>, and <code>&lt;uuid&gt;</code> tokens. Use UUID-based names for stable keys that survive reorders.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📋</div>
+        <h3>order.json sidecar</h3>
+        <p>After every publish, Light3 writes a JSON file containing the full ordered list of photo keys — exactly as arranged in Lightroom. Power your gallery without guessing at sort order.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔒</div>
+        <h3>Credentials stay local</h3>
+        <p>AWS Signature V4 signing happens on your Mac via a bundled helper binary. No proxy, no cloud intermediary, no credentials ever leave your machine.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">♻️</div>
+        <h3>Incremental publish</h3>
+        <p>Lightroom tracks which photos are already up-to-date. Only new or edited photos are re-uploaded. Removing a photo from a collection deletes it from the bucket.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🌍</div>
+        <h3>Any S3-compatible storage</h3>
+        <p>One plugin, any endpoint. Switch from R2 to S3 to B2 by changing the endpoint URL — no code changes, no new installs.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── Static site workflow ──────────────────────────────────────────────── -->
+<section id="static-sites">
+  <div class="wrap">
+    <p class="section-label">Static site workflow</p>
+    <h2>Your Lightroom catalog,<br />powering a real website</h2>
+    <p class="section-sub">
+      Light3 is the missing link between Lightroom's curation tools and
+      static site generators. Curate in Lightroom, publish to S3, let your
+      CI pipeline do the rest.
+    </p>
+
+    <div class="workflow">
+      <div class="workflow-step">
+        <span class="workflow-step-label">Step 1</span>
+        <span class="workflow-step-title">Curate in Lightroom</span>
+        <span class="workflow-step-desc">Organise photos into published collections. Drag to reorder. Rate and cull as usual.</span>
+        <span class="workflow-arrow">→</span>
+      </div>
+      <div class="workflow-step">
+        <span class="workflow-step-label">Step 2</span>
+        <span class="workflow-step-title">Publish to S3</span>
+        <span class="workflow-step-desc">Click Publish. Light3 uploads only changed photos and writes an <code>order.json</code> sidecar per collection.</span>
+        <span class="workflow-arrow">→</span>
+      </div>
+      <div class="workflow-step">
+        <span class="workflow-step-label">Step 3</span>
+        <span class="workflow-step-title">CI reads from S3</span>
+        <span class="workflow-step-desc">Your build pipeline (GitHub Actions, Cloudflare Pages, Netlify…) pulls the images and <code>order.json</code> files from the bucket.</span>
+        <span class="workflow-arrow">→</span>
+      </div>
+      <div class="workflow-step">
+        <span class="workflow-step-label">Step 4</span>
+        <span class="workflow-step-title">SSG builds the site</span>
+        <span class="workflow-step-desc">Hugo, Astro, or Eleventy processes the images, generates responsive sizes, and renders gallery pages in the exact order you arranged them.</span>
+        <span class="workflow-arrow">→</span>
+      </div>
+      <div class="workflow-step">
+        <span class="workflow-step-label">Step 5</span>
+        <span class="workflow-step-title">Deploy</span>
+        <span class="workflow-step-desc">The finished static site is deployed to Cloudflare Pages, Netlify, GitHub Pages, or any CDN — globally fast, zero server costs.</span>
+      </div>
+    </div>
+
+    <p class="section-label" style="margin-bottom:16px;">Works great with</p>
+    <div class="ssg-grid">
+      <div class="ssg-card">
+        <div class="ssg-card-name">Hugo</div>
+        <div class="ssg-card-desc">Built-in image processing pipelines and fast incremental builds make it a natural fit for large photo galleries.</div>
+      </div>
+      <div class="ssg-card">
+        <div class="ssg-card-name">Astro</div>
+        <div class="ssg-card-desc">Component-based layouts with first-class image optimisation. Great for portfolio sites that mix photos with other content.</div>
+      </div>
+      <div class="ssg-card">
+        <div class="ssg-card-name">Eleventy</div>
+        <div class="ssg-card-desc">Minimal and flexible. Pair with the eleventy-img plugin for responsive image generation from your S3 originals.</div>
+      </div>
+      <div class="ssg-card">
+        <div class="ssg-card-name">Next.js</div>
+        <div class="ssg-card-desc">Static export mode with <code>next/image</code> handles optimisation at build time, giving you a dynamic-feeling site from flat files.</div>
+      </div>
+      <div class="ssg-card">
+        <div class="ssg-card-name">Jekyll</div>
+        <div class="ssg-card-desc">Simple data files and Liquid templates. Drop <code>order.json</code> into <code>_data/</code> and iterate straight over your gallery.</div>
+      </div>
+      <div class="ssg-card">
+        <div class="ssg-card-name">Any SSG</div>
+        <div class="ssg-card-desc"><code>order.json</code> is plain JSON — readable by any build tool, script, or framework without special integrations.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Install ───────────────────────────────────────────────────────────── -->
+<section id="install">
+  <div class="wrap">
+    <p class="section-label">Installation</p>
+    <h2>Up and running<br />in five minutes</h2>
+    <p class="section-sub">No Node.js, no Python, no package manager.</p>
+
+    <div class="install-steps">
+      <div class="install-step">
+        <div class="install-num">1</div>
+        <div>
+          <h3>Download the plugin</h3>
+          <p>Grab the latest <code>.lrplugin.zip</code> from the <a href="https://github.com/thkleinert/Light3/releases/latest">releases page</a>. The zip includes a pre-built signing helper — no compilation needed.</p>
+        </div>
+      </div>
+      <div class="install-step">
+        <div class="install-num">2</div>
+        <div>
+          <h3>Unzip and add to Lightroom</h3>
+          <p>Unzip to get <code>light3.lrplugin</code>, then either:</p>
+          <p>Copy it to <code>~/Library/Application Support/Adobe/Lightroom/Modules/</code>, or open <strong>File → Plug-in Manager → Add</strong> and point Lightroom at the folder directly.</p>
+        </div>
+      </div>
+      <div class="install-step">
+        <div class="install-num">3</div>
+        <div>
+          <h3>Set up a Publish Service</h3>
+          <p>In the <strong>Library</strong> module, find <strong>Light3</strong> in the Publish Services panel and click <strong>Set Up…</strong>. Enter your endpoint, bucket, region, and credentials.</p>
+        </div>
+      </div>
+      <div class="install-step">
+        <div class="install-num">4</div>
+        <div>
+          <h3>Create a collection and publish</h3>
+          <p>Drag photos into a published collection under Light3. Click <strong>Publish</strong>. Done — your photos are in the bucket.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Providers ─────────────────────────────────────────────────────────── -->
+<section id="providers">
+  <div class="wrap">
+    <p class="section-label">Provider setup</p>
+    <h2>Quick-start settings<br />for common providers</h2>
+    <p class="section-sub">
+      Copy the settings below into the Light3 publish service configuration.
+    </p>
+
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('r2')">Cloudflare R2</button>
+      <button class="tab" onclick="showTab('s3')">AWS S3</button>
+      <button class="tab" onclick="showTab('b2')">Backblaze B2</button>
+    </div>
+
+    <div id="tab-r2" class="tab-panel active">
+      <p style="font-size:0.875rem; color:var(--muted); margin-bottom:20px;">
+        In the Cloudflare dashboard go to <strong>R2 → your bucket → Settings → S3 Auth</strong> and create an API token with <em>Object Read &amp; Write</em> permissions. Your Account ID is on the R2 overview page.
+      </p>
+      <table class="provider-table">
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Endpoint URL</td><td><code>https://&lt;account-id&gt;.r2.cloudflarestorage.com</code></td></tr>
+          <tr><td>Bucket</td><td>Your R2 bucket name</td></tr>
+          <tr><td>Region</td><td><code>auto</code></td></tr>
+          <tr><td>Access Key ID</td><td>R2 token Access Key ID</td></tr>
+          <tr><td>Secret Access Key</td><td>R2 token Secret Access Key</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div id="tab-s3" class="tab-panel">
+      <p style="font-size:0.875rem; color:var(--muted); margin-bottom:20px;">
+        Create an IAM user with an inline policy granting <code>s3:PutObject</code> and <code>s3:DeleteObject</code> on your bucket, then generate access keys for that user.
+      </p>
+      <pre>{
+  "Effect": "Allow",
+  "Action": ["s3:PutObject", "s3:DeleteObject"],
+  "Resource": "arn:aws:s3:::your-bucket-name/*"
+}</pre>
+      <table class="provider-table" style="margin-top:20px;">
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Endpoint URL</td><td><code>https://s3.&lt;region&gt;.amazonaws.com</code></td></tr>
+          <tr><td>Bucket</td><td>Your bucket name</td></tr>
+          <tr><td>Region</td><td><code>us-east-1</code> (or your bucket's region)</td></tr>
+          <tr><td>Access Key ID</td><td>IAM access key</td></tr>
+          <tr><td>Secret Access Key</td><td>IAM secret key</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div id="tab-b2" class="tab-panel">
+      <p style="font-size:0.875rem; color:var(--muted); margin-bottom:20px;">
+        In Backblaze B2, create an <strong>Application Key</strong> with read and write access to your bucket. The S3-compatible endpoint is shown in the bucket details page.
+      </p>
+      <table class="provider-table">
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Endpoint URL</td><td><code>https://s3.&lt;region&gt;.backblazeb2.com</code></td></tr>
+          <tr><td>Bucket</td><td>Your B2 bucket name</td></tr>
+          <tr><td>Region</td><td>e.g. <code>us-west-004</code> (from bucket details)</td></tr>
+          <tr><td>Access Key ID</td><td>B2 Application Key ID</td></tr>
+          <tr><td>Secret Access Key</td><td>B2 Application Key</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ────────────────────────────────────────────────────────────── -->
+<footer>
+  <div class="wrap">
+    <div class="footer-left">
+      <strong>Light3</strong> — made by <a href="https://github.com/thkleinert">@thkleinert</a> &middot; vibe-coded with <a href="https://claude.ai/code">Claude Code</a>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/thkleinert/Light3">GitHub</a>
+      <a href="https://github.com/thkleinert/Light3/releases">Releases</a>
+      <a href="https://github.com/thkleinert/Light3/issues">Issues</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ── Tab switcher ─────────────────────────────────────────────────────────
+  function showTab(id) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + id).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  // ── Fetch latest release from GitHub API ─────────────────────────────────
+  fetch('https://api.github.com/repos/thkleinert/Light3/releases/latest')
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      if (!data) return;
+      const tag = data.tag_name || '';
+      document.getElementById('version-tag').textContent = tag;
+
+      // Find the .zip asset
+      const asset = (data.assets || []).find(a => a.name.endsWith('.zip'));
+      if (asset) {
+        document.getElementById('download-btn').href = asset.browser_download_url;
+      }
+    })
+    .catch(() => {});
+</script>
+</body>
+</html>

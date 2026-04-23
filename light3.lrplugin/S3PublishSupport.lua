@@ -511,7 +511,7 @@ return {
 
   supportsIncrementalPublish = 'only',
   supportsCustomSortOrder    = true,
-  small_icon                 = 'S3_small.png',
+  small_icon                 = 'light3_small.png',
 
   -- Metadata
   hideSections     = { 'exportLocation', 'fileNaming' },
