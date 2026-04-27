@@ -351,6 +351,18 @@
     }
     .install-step p { font-size: 0.875rem; color: var(--muted); }
     .install-step p + p { margin-top: 6px; }
+    .install-screenshot {
+      margin-top: 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .install-screenshot img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
 
     code, .code {
       font-family: var(--mono);
@@ -689,6 +701,9 @@
           <h3>Unzip and add to Lightroom</h3>
           <p>Unzip to get <code>light3.lrplugin</code>, then either:</p>
           <p>Copy it to <code>~/Library/Application Support/Adobe/Lightroom/Modules/</code>, or open <strong>File → Plug-in Manager → Add</strong> and point Lightroom at the folder directly.</p>
+          <div class="install-screenshot">
+            <img src="find_plugin_manager.png" alt="Light3 appearing in Lightroom's Publish Services panel" />
+          </div>
         </div>
       </div>
       <div class="install-step">
@@ -696,6 +711,9 @@
         <div>
           <h3>Set up a Publish Service</h3>
           <p>In the <strong>Library</strong> module, find <strong>Light3</strong> in the Publish Services panel and click <strong>Set Up…</strong>. Enter your endpoint, bucket, region, and credentials.</p>
+          <div class="install-screenshot">
+            <img src="setup_plugin.png" alt="Light3 publish service configuration dialog" />
+          </div>
         </div>
       </div>
       <div class="install-step">
@@ -703,6 +721,9 @@
         <div>
           <h3>Create a collection and publish</h3>
           <p>Drag photos into a published collection under Light3. Click <strong>Publish</strong>. Done — your photos are in the bucket.</p>
+          <div class="install-screenshot">
+            <img src="publish.png" alt="Clicking Publish in Lightroom to upload photos via Light3" />
+          </div>
         </div>
       </div>
     </div>
