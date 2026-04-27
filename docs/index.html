@@ -387,57 +387,6 @@
       line-height: 1.7;
     }
 
-    /* ── Provider tabs ────────────────────────────────────────────────────── */
-    .tabs {
-      display: flex;
-      gap: 4px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 28px;
-    }
-    .tab {
-      padding: 10px 18px;
-      border-radius: 6px 6px 0 0;
-      font-size: 0.875rem;
-      font-weight: 500;
-      cursor: pointer;
-      color: var(--muted);
-      border: none;
-      background: transparent;
-      font-family: var(--font);
-      transition: color 0.15s;
-      margin-bottom: -1px;
-      border-bottom: 2px solid transparent;
-    }
-    .tab:hover { color: var(--text); }
-    .tab.active {
-      color: var(--accent-hi);
-      border-bottom-color: var(--accent-hi);
-    }
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
-
-    .provider-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.875rem;
-    }
-    .provider-table th {
-      text-align: left;
-      padding: 10px 16px;
-      color: var(--muted);
-      font-weight: 500;
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      border-bottom: 1px solid var(--border);
-    }
-    .provider-table td {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
-    }
-    .provider-table td:first-child { color: var(--muted); width: 160px; }
-    .provider-table tr:last-child td { border-bottom: none; }
 
 /* ── Footer ───────────────────────────────────────────────────────────── */
     footer {
@@ -561,7 +510,6 @@
       <a href="#why-light3">Why Light3?</a>
       <a href="#install">Install</a>
       <a href="#features">Features</a>
-      <a href="#providers">Providers</a>
       <a href="https://github.com/thkleinert/Light3">GitHub ↗</a>
     </div>
   </div>
@@ -783,75 +731,6 @@
   </div>
 </section>
 
-<!-- ── Providers ─────────────────────────────────────────────────────────── -->
-<section id="providers">
-  <div class="wrap">
-    <p class="section-label">Provider setup</p>
-    <h2>Quick-start settings<br />for common providers</h2>
-    <p class="section-sub">
-      Copy the settings below into the Light3 publish service configuration.
-    </p>
-
-    <div class="tabs">
-      <button class="tab active" onclick="showTab('r2')">Cloudflare R2</button>
-      <button class="tab" onclick="showTab('s3')">AWS S3</button>
-      <button class="tab" onclick="showTab('b2')">Backblaze B2</button>
-    </div>
-
-    <div id="tab-r2" class="tab-panel active">
-      <p style="font-size:0.875rem; color:var(--muted); margin-bottom:20px;">
-        In the Cloudflare dashboard go to <strong>R2 → your bucket → Settings → S3 Auth</strong> and create an API token with <em>Object Read &amp; Write</em> permissions. Your Account ID is on the R2 overview page.
-      </p>
-      <table class="provider-table">
-        <thead><tr><th>Field</th><th>Value</th></tr></thead>
-        <tbody>
-          <tr><td>Endpoint URL</td><td><code>https://&lt;account-id&gt;.r2.cloudflarestorage.com</code></td></tr>
-          <tr><td>Bucket</td><td>Your R2 bucket name</td></tr>
-          <tr><td>Region</td><td><code>auto</code></td></tr>
-          <tr><td>Access Key ID</td><td>R2 token Access Key ID</td></tr>
-          <tr><td>Secret Access Key</td><td>R2 token Secret Access Key</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div id="tab-s3" class="tab-panel">
-      <p style="font-size:0.875rem; color:var(--muted); margin-bottom:20px;">
-        Create an IAM user with an inline policy granting <code>s3:PutObject</code> and <code>s3:DeleteObject</code> on your bucket, then generate access keys for that user.
-      </p>
-      <pre>{
-  "Effect": "Allow",
-  "Action": ["s3:PutObject", "s3:DeleteObject"],
-  "Resource": "arn:aws:s3:::your-bucket-name/*"
-}</pre>
-      <table class="provider-table" style="margin-top:20px;">
-        <thead><tr><th>Field</th><th>Value</th></tr></thead>
-        <tbody>
-          <tr><td>Endpoint URL</td><td><code>https://s3.&lt;region&gt;.amazonaws.com</code></td></tr>
-          <tr><td>Bucket</td><td>Your bucket name</td></tr>
-          <tr><td>Region</td><td><code>us-east-1</code> (or your bucket's region)</td></tr>
-          <tr><td>Access Key ID</td><td>IAM access key</td></tr>
-          <tr><td>Secret Access Key</td><td>IAM secret key</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div id="tab-b2" class="tab-panel">
-      <p style="font-size:0.875rem; color:var(--muted); margin-bottom:20px;">
-        In Backblaze B2, create an <strong>Application Key</strong> with read and write access to your bucket. The S3-compatible endpoint is shown in the bucket details page.
-      </p>
-      <table class="provider-table">
-        <thead><tr><th>Field</th><th>Value</th></tr></thead>
-        <tbody>
-          <tr><td>Endpoint URL</td><td><code>https://s3.&lt;region&gt;.backblazeb2.com</code></td></tr>
-          <tr><td>Bucket</td><td>Your B2 bucket name</td></tr>
-          <tr><td>Region</td><td>e.g. <code>us-west-004</code> (from bucket details)</td></tr>
-          <tr><td>Access Key ID</td><td>B2 Application Key ID</td></tr>
-          <tr><td>Secret Access Key</td><td>B2 Application Key</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
 
 <!-- ── Footer ────────────────────────────────────────────────────────────── -->
 <footer>
@@ -868,14 +747,6 @@
 </footer>
 
 <script>
-  // ── Tab switcher ─────────────────────────────────────────────────────────
-  function showTab(id) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    document.getElementById('tab-' + id).classList.add('active');
-    event.target.classList.add('active');
-  }
-
   // ── Fetch latest release from GitHub API ─────────────────────────────────
   fetch('https://api.github.com/repos/thkleinert/Light3/releases/latest')
     .then(r => r.ok ? r.json() : null)
