@@ -32,6 +32,7 @@ The signing helper runs locally — your credentials never leave your machine.
 
 ## Requirements
 
+- **macOS** (the signing helper binary is macOS-only; Windows/Linux are untested)
 - **Lightroom Classic** 6 or later
 - An S3-compatible bucket (Cloudflare R2, AWS S3, etc.)
 
