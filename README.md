@@ -95,10 +95,10 @@ Create collections and optionally group them in collection sets. Light3 mirrors 
 <bucket>/<prefix>/<CollectionSet>/.../<Collection>/<filename>
 ```
 
-For example, with prefix `galleries/`, collection set `Weddings`, and collection `Smith 2026`:
+For example, with collection set `Weddings` and collection `Smith 2026`:
 
 ```
-my-photos/galleries/Weddings/Smith_2026/00001_Smith_2026.jpg
+my-photos/Weddings/Smith_2026/00001_Smith_2026.jpg
 ```
 
 ### File naming
