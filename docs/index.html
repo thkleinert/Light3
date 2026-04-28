@@ -351,6 +351,18 @@
     }
     .install-step p { font-size: 0.875rem; color: var(--muted); }
     .install-step p + p { margin-top: 6px; }
+    .install-screenshot {
+      margin-top: 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .install-screenshot img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
 
     code, .code {
       font-family: var(--mono);
@@ -375,57 +387,6 @@
       line-height: 1.7;
     }
 
-    /* ── Provider tabs ────────────────────────────────────────────────────── */
-    .tabs {
-      display: flex;
-      gap: 4px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 28px;
-    }
-    .tab {
-      padding: 10px 18px;
-      border-radius: 6px 6px 0 0;
-      font-size: 0.875rem;
-      font-weight: 500;
-      cursor: pointer;
-      color: var(--muted);
-      border: none;
-      background: transparent;
-      font-family: var(--font);
-      transition: color 0.15s;
-      margin-bottom: -1px;
-      border-bottom: 2px solid transparent;
-    }
-    .tab:hover { color: var(--text); }
-    .tab.active {
-      color: var(--accent-hi);
-      border-bottom-color: var(--accent-hi);
-    }
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
-
-    .provider-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.875rem;
-    }
-    .provider-table th {
-      text-align: left;
-      padding: 10px 16px;
-      color: var(--muted);
-      font-weight: 500;
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      border-bottom: 1px solid var(--border);
-    }
-    .provider-table td {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
-    }
-    .provider-table td:first-child { color: var(--muted); width: 160px; }
-    .provider-table tr:last-child td { border-bottom: none; }
 
 /* ── Footer ───────────────────────────────────────────────────────────── */
     footer {
@@ -546,11 +507,9 @@
       Light3
     </a>
     <div class="nav-links">
-      <a href="#how-it-works">How it works</a>
-      <a href="#features">Features</a>
+      <a href="#why-light3">Why Light3?</a>
       <a href="#install">Install</a>
-      <a href="#static-sites">Static sites</a>
-      <a href="#providers">Providers</a>
+      <a href="#features">Features</a>
       <a href="https://github.com/thkleinert/Light3">GitHub ↗</a>
     </div>
   </div>
@@ -563,7 +522,7 @@
       <div class="badge" style="margin-bottom:0;">Free &amp; open source</div>
       <div class="badge" style="margin-bottom:0;background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.12);color:var(--muted);">Vibe-coded with AI</div>
     </div>
-    <h1>Publish your photos to<br /><em>S3-compatible storage</em></h1>
+    <h1>Publish from Lightroom to<br /><em>S3-compatible storage</em></h1>
     <p class="hero-sub">
       A Lightroom Classic publish plugin that turns your catalog into the
       image backend for a static portfolio or gallery website — built with
@@ -596,87 +555,11 @@
   </div>
 </div>
 
-<!-- ── How it works ─────────────────────────────────────────────────────── -->
-<section id="how-it-works">
+<!-- ── Why Light3? ───────────────────────────────────────────────────────── -->
+<section id="why-light3">
   <div class="wrap">
-    <p class="section-label">How it works</p>
-    <h2>Organize in Lightroom,<br />store anywhere</h2>
-    <p class="section-sub">
-      Light3 adds a Publish Service to Lightroom's library panel.
-      Organize photos into collections, hit Publish — done.
-    </p>
-
-    <div class="steps">
-      <div class="step">
-        <div class="step-num">01</div>
-        <h3>Organize</h3>
-        <p>Create published collections and collection sets in Lightroom's library panel, exactly like you already do. Drag photos in, arrange them, rate and cull.</p>
-      </div>
-      <div class="step">
-        <div class="step-num">02</div>
-        <h3>Publish</h3>
-        <p>Click Publish. Light3 uploads only new or changed photos. Lightroom tracks what's already up-to-date so nothing is re-uploaded unnecessarily.</p>
-      </div>
-      <div class="step">
-        <div class="step-num">03</div>
-        <h3>Share</h3>
-        <p>Your photos land in the bucket at a predictable path. Light3 also writes an <code>order.json</code> sidecar so any web gallery can display them in the exact order you arranged them.</p>
-      </div>
-    </div>
-
-  </div>
-</section>
-
-<!-- ── Features ─────────────────────────────────────────────────────────── -->
-<section id="features">
-  <div class="wrap">
-    <p class="section-label">Features</p>
-    <h2>Everything you need,<br />nothing you don't</h2>
-    <p class="section-sub">
-      Built for photographers who self-host — not for SaaS platforms that lock in your files.
-    </p>
-
-    <div class="features">
-      <div class="feature">
-        <div class="feature-icon">🗂️</div>
-        <h3>Collection hierarchy</h3>
-        <p>Collection sets map directly to S3 path segments. <code>Weddings/Smith 2026/</code> in Lightroom becomes <code>galleries/Weddings/Smith_2026/</code> in your bucket.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">🔢</div>
-        <h3>Flexible file naming</h3>
-        <p>Templates with <code>&lt;sequence&gt;</code>, <code>&lt;collection&gt;</code>, <code>&lt;file&gt;</code>, and <code>&lt;uuid&gt;</code> tokens. Use UUID-based names for stable keys that survive reorders.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">📋</div>
-        <h3>order.json sidecar</h3>
-        <p>After every publish, Light3 writes a JSON file containing the full ordered list of photo keys — exactly as arranged in Lightroom. Power your gallery without guessing at sort order.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">🔒</div>
-        <h3>Credentials stay local</h3>
-        <p>AWS Signature V4 signing happens on your Mac via a bundled helper binary. No proxy, no cloud intermediary, no credentials ever leave your machine.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">♻️</div>
-        <h3>Incremental publish</h3>
-        <p>Lightroom tracks which photos are already up-to-date. Only new or edited photos are re-uploaded. Removing a photo from a collection deletes it from the bucket.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">🌍</div>
-        <h3>Any S3-compatible storage</h3>
-        <p>One plugin, any endpoint. Switch from R2 to S3 to B2 by changing the endpoint URL — no code changes, no new installs.</p>
-      </div>
-    </div>
-
-  </div>
-</section>
-
-<!-- ── Static site workflow ──────────────────────────────────────────────── -->
-<section id="static-sites">
-  <div class="wrap">
-    <p class="section-label">Static site workflow</p>
-    <h2>Your Lightroom catalog,<br />powering a real website</h2>
+    <p class="section-label">Why Light3?</p>
+    <h2>Your Lightroom collections<br />powering a static website</h2>
     <p class="section-sub">
       Light3 is the missing link between Lightroom's curation tools and
       static site generators. Curate in Lightroom, publish to S3, let your
@@ -687,7 +570,7 @@
       <div class="workflow-step">
         <span class="workflow-step-label">Step 1</span>
         <span class="workflow-step-title">Curate in Lightroom</span>
-        <span class="workflow-step-desc">Organise photos into published collections. Drag to reorder. Rate and cull as usual.</span>
+        <span class="workflow-step-desc">Organize photos into published collections. Drag to reorder. Rate and cull as usual.</span>
         <span class="workflow-arrow">→</span>
       </div>
       <div class="workflow-step">
@@ -723,7 +606,7 @@
       </div>
       <div class="ssg-card">
         <div class="ssg-card-name">Astro</div>
-        <div class="ssg-card-desc">Component-based layouts with first-class image optimisation. Great for portfolio sites that mix photos with other content.</div>
+        <div class="ssg-card-desc">Component-based layouts with first-class image optimization. Great for portfolio sites that mix photos with other content.</div>
       </div>
       <div class="ssg-card">
         <div class="ssg-card-name">Eleventy</div>
@@ -731,7 +614,7 @@
       </div>
       <div class="ssg-card">
         <div class="ssg-card-name">Next.js</div>
-        <div class="ssg-card-desc">Static export mode with <code>next/image</code> handles optimisation at build time, giving you a dynamic-feeling site from flat files.</div>
+        <div class="ssg-card-desc">Static export mode with <code>next/image</code> handles optimization at build time, giving you a dynamic-feeling site from flat files.</div>
       </div>
       <div class="ssg-card">
         <div class="ssg-card-name">Jekyll</div>
@@ -750,14 +633,13 @@
   <div class="wrap">
     <p class="section-label">Installation</p>
     <h2>Up and running<br />in five minutes</h2>
-    <p class="section-sub">No Node.js, no Python, no package manager.</p>
 
     <div class="install-steps">
       <div class="install-step">
         <div class="install-num">1</div>
         <div>
           <h3>Download the plugin</h3>
-          <p>Grab the latest <code>.lrplugin.zip</code> from the <a href="https://github.com/thkleinert/Light3/releases/latest">releases page</a>. The zip includes a pre-built signing helper — no compilation needed.</p>
+          <p>Grab the latest <code>.lrplugin.zip</code> from the <a href="https://github.com/thkleinert/Light3/releases/latest">releases page</a>.</p>
         </div>
       </div>
       <div class="install-step">
@@ -771,90 +653,83 @@
       <div class="install-step">
         <div class="install-num">3</div>
         <div>
-          <h3>Set up a Publish Service</h3>
-          <p>In the <strong>Library</strong> module, find <strong>Light3</strong> in the Publish Services panel and click <strong>Set Up…</strong>. Enter your endpoint, bucket, region, and credentials.</p>
+          <h3>Open the Publishing Manager</h3>
+          <p>In the <strong>Library</strong> module, hit the <strong>+</strong> symbol next to Publish Services and open the Publishing Manager.</p>
+          <div class="install-screenshot">
+            <img src="find_plugin_manager.png" alt="Opening the Publishing Manager in Lightroom's Library module" />
+          </div>
         </div>
       </div>
       <div class="install-step">
         <div class="install-num">4</div>
         <div>
+          <h3>Configure Light3</h3>
+          <p>Select <strong>Light3</strong> in the Publishing Manager and enter your endpoint URL, bucket, region, and credentials.</p>
+          <div class="install-screenshot">
+            <img src="setup_plugin.png" alt="Light3 publish service configuration dialog" />
+          </div>
+        </div>
+      </div>
+      <div class="install-step">
+        <div class="install-num">5</div>
+        <div>
           <h3>Create a collection and publish</h3>
           <p>Drag photos into a published collection under Light3. Click <strong>Publish</strong>. Done — your photos are in the bucket.</p>
+          <div class="install-screenshot">
+            <img src="publish.png" alt="Clicking Publish in Lightroom to upload photos via Light3" />
+          </div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ── Providers ─────────────────────────────────────────────────────────── -->
-<section id="providers">
+<!-- ── Features ─────────────────────────────────────────────────────────── -->
+<section id="features">
   <div class="wrap">
-    <p class="section-label">Provider setup</p>
-    <h2>Quick-start settings<br />for common providers</h2>
+    <p class="section-label">Features</p>
+    <h2>Everything you need,<br />nothing you don't</h2>
     <p class="section-sub">
-      Copy the settings below into the Light3 publish service configuration.
+      Purpose-built for photographers who want to publish their work on their
+      own terms — whether that's a portfolio site, a client gallery, or a static website built with Hugo, Astro, or Eleventy.
     </p>
 
-    <div class="tabs">
-      <button class="tab active" onclick="showTab('r2')">Cloudflare R2</button>
-      <button class="tab" onclick="showTab('s3')">AWS S3</button>
-      <button class="tab" onclick="showTab('b2')">Backblaze B2</button>
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">🗂️</div>
+        <h3>Collection hierarchy</h3>
+        <p>Collection sets map directly to S3 path segments. <code>Weddings/Smith 2026/</code> in Lightroom becomes <code>Weddings/Smith_2026/</code> in your bucket.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔢</div>
+        <h3>Flexible file naming</h3>
+        <p>Templates let you keep the original filename, build something like <code>&lt;collection&gt;_&lt;sequence&gt;</code>, or use UUIDs for stable, collision-free keys.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📋</div>
+        <h3>order.json sidecar</h3>
+        <p>After every publish, Light3 writes a JSON file with the full ordered list of photo keys. Your gallery or static site generator can read it to display photos in exactly the order you set in Lightroom.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔒</div>
+        <h3>Credentials stay local</h3>
+        <p>AWS Signature V4 signing happens on your Mac via a bundled helper binary. No proxy, no cloud intermediary, no credentials ever leave your machine.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">♻️</div>
+        <h3>Incremental publish</h3>
+        <p>Lightroom tracks which photos are already up-to-date. Only new or edited photos are re-uploaded. Removing a photo from a collection deletes it from the bucket.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🌍</div>
+        <h3>Any S3-compatible storage</h3>
+        <p>One plugin, any endpoint. Switch from R2 to S3 to B2 by changing the endpoint URL — no code changes, no new installs.</p>
+      </div>
     </div>
 
-    <div id="tab-r2" class="tab-panel active">
-      <p style="font-size:0.875rem; color:var(--muted); margin-bottom:20px;">
-        In the Cloudflare dashboard go to <strong>R2 → your bucket → Settings → S3 Auth</strong> and create an API token with <em>Object Read &amp; Write</em> permissions. Your Account ID is on the R2 overview page.
-      </p>
-      <table class="provider-table">
-        <thead><tr><th>Field</th><th>Value</th></tr></thead>
-        <tbody>
-          <tr><td>Endpoint URL</td><td><code>https://&lt;account-id&gt;.r2.cloudflarestorage.com</code></td></tr>
-          <tr><td>Bucket</td><td>Your R2 bucket name</td></tr>
-          <tr><td>Region</td><td><code>auto</code></td></tr>
-          <tr><td>Access Key ID</td><td>R2 token Access Key ID</td></tr>
-          <tr><td>Secret Access Key</td><td>R2 token Secret Access Key</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div id="tab-s3" class="tab-panel">
-      <p style="font-size:0.875rem; color:var(--muted); margin-bottom:20px;">
-        Create an IAM user with an inline policy granting <code>s3:PutObject</code> and <code>s3:DeleteObject</code> on your bucket, then generate access keys for that user.
-      </p>
-      <pre>{
-  "Effect": "Allow",
-  "Action": ["s3:PutObject", "s3:DeleteObject"],
-  "Resource": "arn:aws:s3:::your-bucket-name/*"
-}</pre>
-      <table class="provider-table" style="margin-top:20px;">
-        <thead><tr><th>Field</th><th>Value</th></tr></thead>
-        <tbody>
-          <tr><td>Endpoint URL</td><td><code>https://s3.&lt;region&gt;.amazonaws.com</code></td></tr>
-          <tr><td>Bucket</td><td>Your bucket name</td></tr>
-          <tr><td>Region</td><td><code>us-east-1</code> (or your bucket's region)</td></tr>
-          <tr><td>Access Key ID</td><td>IAM access key</td></tr>
-          <tr><td>Secret Access Key</td><td>IAM secret key</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div id="tab-b2" class="tab-panel">
-      <p style="font-size:0.875rem; color:var(--muted); margin-bottom:20px;">
-        In Backblaze B2, create an <strong>Application Key</strong> with read and write access to your bucket. The S3-compatible endpoint is shown in the bucket details page.
-      </p>
-      <table class="provider-table">
-        <thead><tr><th>Field</th><th>Value</th></tr></thead>
-        <tbody>
-          <tr><td>Endpoint URL</td><td><code>https://s3.&lt;region&gt;.backblazeb2.com</code></td></tr>
-          <tr><td>Bucket</td><td>Your B2 bucket name</td></tr>
-          <tr><td>Region</td><td>e.g. <code>us-west-004</code> (from bucket details)</td></tr>
-          <tr><td>Access Key ID</td><td>B2 Application Key ID</td></tr>
-          <tr><td>Secret Access Key</td><td>B2 Application Key</td></tr>
-        </tbody>
-      </table>
-    </div>
   </div>
 </section>
+
 
 <!-- ── Footer ────────────────────────────────────────────────────────────── -->
 <footer>
@@ -871,14 +746,6 @@
 </footer>
 
 <script>
-  // ── Tab switcher ─────────────────────────────────────────────────────────
-  function showTab(id) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    document.getElementById('tab-' + id).classList.add('active');
-    event.target.classList.add('active');
-  }
-
   // ── Fetch latest release from GitHub API ─────────────────────────────────
   fetch('https://api.github.com/repos/thkleinert/Light3/releases/latest')
     .then(r => r.ok ? r.json() : null)

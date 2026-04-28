@@ -32,6 +32,7 @@ The signing helper runs locally — your credentials never leave your machine.
 
 ## Requirements
 
+- **macOS** (the signing helper binary is macOS-only; Windows/Linux are untested)
 - **Lightroom Classic** 6 or later
 - An S3-compatible bucket (Cloudflare R2, AWS S3, etc.)
 
@@ -80,7 +81,7 @@ Restart Lightroom after installing.
 | Region | AWS region or `auto` for R2 | `auto` |
 | Access Key ID | S3 access key | `abc123def456` |
 | Secret Access Key | S3 secret key | (hidden) |
-| Key prefix | Optional path prefix inside the bucket | `galleries/` |
+| Key prefix | Optional path prefix inside the bucket | `photos/` |
 | File naming | Template for S3 filenames (see below) | `<sequence>_<collection>` |
 
 ---
@@ -95,10 +96,10 @@ Create collections and optionally group them in collection sets. Light3 mirrors 
 <bucket>/<prefix>/<CollectionSet>/.../<Collection>/<filename>
 ```
 
-For example, with prefix `galleries/`, collection set `Weddings`, and collection `Smith 2026`:
+For example, with collection set `Weddings` and collection `Smith 2026`:
 
 ```
-my-photos/galleries/Weddings/Smith_2026/00001_Smith_2026.jpg
+my-photos/Weddings/Smith_2026/00001_Smith_2026.jpg
 ```
 
 ### File naming
@@ -124,16 +125,16 @@ Photos within a collection can be reordered by drag-and-drop in Lightroom. Light
 
 After every publish run, Light3 writes an `order.json` sidecar file to the collection's S3 prefix. This file contains the full ordered list of photo keys as they appear in Lightroom, so downstream consumers (galleries, websites) can display photos in the correct sequence without relying on filename sorting.
 
-Example `order.json` for a collection at `galleries/Weddings/Smith_2026/`:
+Example `order.json` for a collection at `Weddings/Smith_2026/`:
 
 ```json
 {
   "collection": "Smith_2026",
-  "prefix": "galleries/Weddings/Smith_2026/",
+  "prefix": "Weddings/Smith_2026/",
   "photos": [
-    "galleries/Weddings/Smith_2026/00003_DSC_0099.jpg",
-    "galleries/Weddings/Smith_2026/00001_DSC_0042.jpg",
-    "galleries/Weddings/Smith_2026/00002_DSC_0077.jpg"
+    "Weddings/Smith_2026/00003_DSC_0099.jpg",
+    "Weddings/Smith_2026/00001_DSC_0042.jpg",
+    "Weddings/Smith_2026/00002_DSC_0077.jpg"
   ]
 }
 ```
