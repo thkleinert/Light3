@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://light3.thomaskleinert.com/sitemap.xml
