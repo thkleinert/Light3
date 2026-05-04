@@ -517,7 +517,7 @@ return {
   hideSections     = { 'exportLocation', 'fileNaming' },
   allowFileFormats = { 'JPEG', 'TIFF', 'PNG', 'DNG' },
   allowColorSpaces = nil,  -- all allowed
-  canExportVideo   = false,
+  canExportVideo   = true,
 
   -- Settings UI
   sectionsForTopOfDialog = sectionsForTopOfDialog,
