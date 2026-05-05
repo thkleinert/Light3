@@ -5,9 +5,11 @@ Publish service provider for Light3 — handles Lightroom publish lifecycle.
 
 local LrApplication   = import 'LrApplication'
 local LrColor         = import 'LrColor'
+local LrDialogs       = import 'LrDialogs'
 local LrErrors        = import 'LrErrors'
 local LrPathUtils     = import 'LrPathUtils'
 local LrStringUtils   = import 'LrStringUtils'
+local LrTasks         = import 'LrTasks'
 local LrView          = import 'LrView'
 
 local S3Upload = require 'S3Upload'
@@ -15,19 +17,8 @@ local S3Upload = require 'S3Upload'
 -- Path to the signing helper bundled inside the plugin folder
 local signingHelperPath = LrPathUtils.child(_PLUGIN.path, 'light3-sign')
 
--- ---------------------------------------------------------------------------
--- Module-level state: passed from processRenderedPhotos to
--- imposeSortOrderOnPublishedCollection (called by LR after the publish run).
--- ---------------------------------------------------------------------------
+local updateOrderJson  -- forward declaration; defined after processRenderedPhotos
 
-local pendingOrder = nil
--- When set, has the shape:
---   publishSettings  table   — export settings (endpoint, bucket, …)
---   collectionName   string  — sanitised collection name
---   prefix           string  — S3 key prefix including trailing slash
---   renderedKeys     table   — S3 keys in render-loop order (correct LR order)
---   keyRenames       table   — { [oldKey] = newKey } for re-keyed photos
---   isFullPublish    bool    — true when every photo in the collection was rendered
 
 -- ---------------------------------------------------------------------------
 -- Collection path helper
@@ -286,7 +277,7 @@ local function processRenderedPhotos(functionContext, exportContext)
   local alreadyPublished = pubCollection and #(pubCollection:getPublishedPhotos() or {}) or 0
   local isFullPublish    = (nPhotos >= alreadyPublished)
 
-  -- Collect render-loop order and key renames for imposeSortOrderOnPublishedCollection
+  -- Collect render-loop order and key renames for updateOrderJson
   local renderedKeys = {}
   local keyRenames   = {}   -- { [oldKey] = newKey } for photos whose key changed
 
@@ -336,30 +327,29 @@ local function processRenderedPhotos(functionContext, exportContext)
     end
   end
 
-  -- Store order state for imposeSortOrderOnPublishedCollection, which Lightroom
-  -- calls after this function with the collection still intact.
+  LrTasks.execute(string.format(
+    "echo 'processRenderedPhotos done: canceled=%s renderedKeys=%d' >> /tmp/light3_debug.txt",
+    tostring(progressScope:isCanceled()), #renderedKeys))
+
   if not progressScope:isCanceled() and #renderedKeys > 0 then
-    pendingOrder = {
-      publishSettings = exportSettings,
-      collectionName  = collectionName,
-      prefix          = keyPrefix,
-      renderedKeys    = renderedKeys,
-      keyRenames      = keyRenames,
-      isFullPublish   = isFullPublish,
-    }
+    updateOrderJson(exportSettings, keyPrefix, collectionName, renderedKeys, keyRenames, isFullPublish)
   end
 
   progressScope:done()
 end
 
 -- ---------------------------------------------------------------------------
--- Write order.json from an ordered list of S3 keys
+-- Write an ordered list of S3 keys as order.json to the bucket.
 -- ---------------------------------------------------------------------------
 
 local function writeOrderJson(publishSettings, orderedKeys, collectionName)
   if not orderedKeys or #orderedKeys == 0 then return end
 
   local prefix = orderedKeys[1]:match('^(.*/)') or ''
+
+  LrTasks.execute(string.format(
+    "echo 'writeOrderJson: key=%s count=%d' >> /tmp/light3_debug.txt",
+    prefix .. 'order.json', #orderedKeys))
 
   local keyStrings = {}
   for _, k in ipairs(orderedKeys) do
@@ -373,7 +363,7 @@ local function writeOrderJson(publishSettings, orderedKeys, collectionName)
     table.concat(keyStrings, ',')
   )
 
-  S3Upload.putContent {
+  local ok, err = S3Upload.putContent {
     content           = json,
     key               = prefix .. 'order.json',
     endpoint          = publishSettings.endpoint,
@@ -383,42 +373,42 @@ local function writeOrderJson(publishSettings, orderedKeys, collectionName)
     secretAccessKey   = publishSettings.secretAccessKey,
     signingHelperPath = signingHelperPath,
   }
+  LrTasks.execute(string.format(
+    "echo 'putContent result: ok=%s err=%s' >> /tmp/light3_debug.txt",
+    tostring(ok), tostring(err)))
+  if not ok then
+    LrDialogs.message('Light3: order.json failed', err or 'unknown error', 'critical')
+  end
 end
 
 -- ---------------------------------------------------------------------------
--- Impose sort order (called by Lightroom after every publish run)
+-- Build and upload order.json — called directly from processRenderedPhotos.
+-- For a full publish the render-loop order is authoritative.
+-- For a partial publish the existing order.json is fetched and patched.
 -- ---------------------------------------------------------------------------
 
-local function imposeSortOrderOnPublishedCollection(publishSettings, info)
-  -- Nothing to do if processRenderedPhotos didn't run (e.g. cancelled early)
-  if not pendingOrder then return end
-
-  local order  = pendingOrder
-  pendingOrder = nil   -- consume the pending state
-
+updateOrderJson = function(publishSettings, prefix, collectionName, renderedKeys, keyRenames, isFullPublish)
+  LrTasks.execute(string.format(
+    "echo 'updateOrderJson called: prefix=%s isFullPublish=%s keys=%d' >> /tmp/light3_debug.txt",
+    tostring(prefix), tostring(isFullPublish), #renderedKeys))
   local finalKeys
 
-  if order.isFullPublish then
-    -- The render loop covered all photos in the collection → its order is
-    -- the definitive Lightroom custom sort order.
-    finalKeys = order.renderedKeys
+  if isFullPublish then
+    finalKeys = renderedKeys
   else
-    -- Partial publish: fetch the existing order.json and patch it.
     local orderJson = S3Upload.getContent {
-      key               = order.prefix .. 'order.json',
-      endpoint          = order.publishSettings.endpoint,
-      bucket            = order.publishSettings.bucket,
-      region            = order.publishSettings.region or 'auto',
-      accessKeyId       = order.publishSettings.accessKeyId,
-      secretAccessKey   = order.publishSettings.secretAccessKey,
+      key               = prefix .. 'order.json',
+      endpoint          = publishSettings.endpoint,
+      bucket            = publishSettings.bucket,
+      region            = publishSettings.region or 'auto',
+      accessKeyId       = publishSettings.accessKeyId,
+      secretAccessKey   = publishSettings.secretAccessKey,
       signingHelperPath = signingHelperPath,
     }
 
     if not orderJson then
-      -- No existing order.json — fall back to render loop order
-      finalKeys = order.renderedKeys
+      finalKeys = renderedKeys
     else
-      -- Parse existing photo list
       local existingKeys = {}
       local photosJson   = orderJson:match('"photos"%s*:%s*%[(.-)%]')
       if photosJson then
@@ -427,21 +417,18 @@ local function imposeSortOrderOnPublishedCollection(publishSettings, info)
         end
       end
 
-      -- Apply any key renames (e.g. sequence numbers changed) and deduplicate
-      local renames  = order.keyRenames
       local finalSet = {}
       finalKeys = {}
 
       for _, k in ipairs(existingKeys) do
-        local newK = renames[k] or k
+        local newK = keyRenames[k] or k
         if not finalSet[newK] then
           finalSet[newK] = true
           table.insert(finalKeys, newK)
         end
       end
 
-      -- Append keys for photos that are new to the collection (no entry yet)
-      for _, k in ipairs(order.renderedKeys) do
+      for _, k in ipairs(renderedKeys) do
         if not finalSet[k] then
           finalSet[k] = true
           table.insert(finalKeys, k)
@@ -450,7 +437,15 @@ local function imposeSortOrderOnPublishedCollection(publishSettings, info)
     end
   end
 
-  writeOrderJson(order.publishSettings, finalKeys, order.collectionName)
+  writeOrderJson(publishSettings, finalKeys, collectionName)
+end
+
+-- ---------------------------------------------------------------------------
+-- Impose sort order (called by Lightroom for custom-sorted collections)
+-- order.json is already written by processRenderedPhotos; nothing to do here.
+-- ---------------------------------------------------------------------------
+
+local function imposeSortOrderOnPublishedCollection(publishSettings, info)
 end
 
 -- ---------------------------------------------------------------------------
