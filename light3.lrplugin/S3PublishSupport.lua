@@ -9,7 +9,6 @@ local LrDialogs       = import 'LrDialogs'
 local LrErrors        = import 'LrErrors'
 local LrPathUtils     = import 'LrPathUtils'
 local LrStringUtils   = import 'LrStringUtils'
-local LrTasks         = import 'LrTasks'
 local LrView          = import 'LrView'
 
 local S3Upload = require 'S3Upload'
@@ -327,10 +326,6 @@ local function processRenderedPhotos(functionContext, exportContext)
     end
   end
 
-  LrTasks.execute(string.format(
-    "echo 'processRenderedPhotos done: canceled=%s renderedKeys=%d' >> /tmp/light3_debug.txt",
-    tostring(progressScope:isCanceled()), #renderedKeys))
-
   if not progressScope:isCanceled() and #renderedKeys > 0 then
     updateOrderJson(exportSettings, keyPrefix, collectionName, renderedKeys, keyRenames, isFullPublish)
   end
@@ -346,10 +341,6 @@ local function writeOrderJson(publishSettings, orderedKeys, collectionName)
   if not orderedKeys or #orderedKeys == 0 then return end
 
   local prefix = orderedKeys[1]:match('^(.*/)') or ''
-
-  LrTasks.execute(string.format(
-    "echo 'writeOrderJson: key=%s count=%d' >> /tmp/light3_debug.txt",
-    prefix .. 'order.json', #orderedKeys))
 
   local keyStrings = {}
   for _, k in ipairs(orderedKeys) do
@@ -373,9 +364,6 @@ local function writeOrderJson(publishSettings, orderedKeys, collectionName)
     secretAccessKey   = publishSettings.secretAccessKey,
     signingHelperPath = signingHelperPath,
   }
-  LrTasks.execute(string.format(
-    "echo 'putContent result: ok=%s err=%s' >> /tmp/light3_debug.txt",
-    tostring(ok), tostring(err)))
   if not ok then
     LrDialogs.message('Light3: order.json failed', err or 'unknown error', 'critical')
   end
@@ -388,9 +376,6 @@ end
 -- ---------------------------------------------------------------------------
 
 updateOrderJson = function(publishSettings, prefix, collectionName, renderedKeys, keyRenames, isFullPublish)
-  LrTasks.execute(string.format(
-    "echo 'updateOrderJson called: prefix=%s isFullPublish=%s keys=%d' >> /tmp/light3_debug.txt",
-    tostring(prefix), tostring(isFullPublish), #renderedKeys))
   local finalKeys
 
   if isFullPublish then
