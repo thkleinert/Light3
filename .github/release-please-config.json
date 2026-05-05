@@ -1,10 +1,14 @@
 {
-  "release-type": "simple",
-  "include-component-in-tag": false,
-  "extra-files": [
-    {
-      "type": "generic",
-      "path": "light3.lrplugin/Info.lua"
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "component": "",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "light3.lrplugin/Info.lua"
+        }
+      ]
     }
-  ]
+  }
 }
