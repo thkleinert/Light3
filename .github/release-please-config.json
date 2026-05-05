@@ -1,10 +1,14 @@
 {
-  "release-type": "simple",
-  "bootstrap-sha": "c0e94a5797641a31aa1e40cb9c2c130436669518",
-  "extra-files": [
-    {
-      "type": "generic",
-      "path": "light3.lrplugin/Info.lua"
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "component": "",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "light3.lrplugin/Info.lua"
+        }
+      ]
     }
-  ]
+  }
 }
