@@ -9,6 +9,7 @@ local LrDialogs       = import 'LrDialogs'
 local LrErrors        = import 'LrErrors'
 local LrPathUtils     = import 'LrPathUtils'
 local LrStringUtils   = import 'LrStringUtils'
+local LrTasks         = import 'LrTasks'
 local LrView          = import 'LrView'
 
 local S3Upload = require 'S3Upload'
@@ -373,21 +374,33 @@ end
 updateOrderJson = function(publishSettings, prefix, collectionName, renderedKeys, keyRenames, pubCollection)
   local finalKeys = {}
 
+  local dbg = function(msg)
+    LrTasks.execute("echo '" .. os.date('%H:%M:%S') .. " " .. msg:gsub("'", "") .. "' >> /tmp/light3_order.log 2>&1")
+  end
+
+  dbg('updateOrderJson called renderedKeys=' .. #renderedKeys .. ' pubCollection=' .. tostring(pubCollection ~= nil))
+
   if pubCollection then
     local publishedPhotos = pubCollection:getPublishedPhotos() or {}
+    dbg('getPublishedPhotos count=' .. #publishedPhotos)
     for _, pubPhoto in ipairs(publishedPhotos) do
       local key = pubPhoto:getRemoteId()
+      dbg('  getRemoteId=' .. tostring(key))
       if key and key ~= '' then
         table.insert(finalKeys, keyRenames[key] or key)
       end
     end
   end
 
+  dbg('finalKeys before fallback=' .. #finalKeys)
+
   if #finalKeys == 0 then
     finalKeys = renderedKeys
   end
 
+  dbg('writing order.json with ' .. #finalKeys .. ' keys')
   writeOrderJson(publishSettings, finalKeys, collectionName)
+  dbg('writeOrderJson returned')
 end
 
 -- ---------------------------------------------------------------------------
