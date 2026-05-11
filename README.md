@@ -119,9 +119,14 @@ Examples:
 
 The file extension is always appended automatically.
 
-### Custom sort order
+### Sort order
 
-Photos within a collection can be reordered by drag-and-drop in Lightroom. Light3 respects this order — combined with the `<sequence>` token, the upload sequence matches your Lightroom ordering exactly.
+Light3 supports two collection sort modes:
+
+- **Capture Time** — photos are ordered by EXIF capture date, ascending. This is the default for most collections.
+- **Custom Order** — drag-and-drop order set in Lightroom is respected exactly. Combined with the `<sequence>` token, the upload sequence matches your manual ordering precisely.
+
+Other sort modes (file name, rating, label…) fall back to capture time order.
 
 After every publish run, Light3 writes an `order.json` sidecar file to the collection's S3 prefix. This file contains the full ordered list of photo keys as they appear in Lightroom, so downstream consumers (galleries, websites) can display photos in the correct sequence without relying on filename sorting.
 

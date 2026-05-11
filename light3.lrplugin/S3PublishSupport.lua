@@ -9,6 +9,7 @@ local LrDialogs       = import 'LrDialogs'
 local LrErrors        = import 'LrErrors'
 local LrPathUtils     = import 'LrPathUtils'
 local LrStringUtils   = import 'LrStringUtils'
+local LrTasks         = import 'LrTasks'
 local LrView          = import 'LrView'
 
 local S3Upload = require 'S3Upload'
@@ -269,16 +270,10 @@ local function processRenderedPhotos(functionContext, exportContext)
     end
   end
 
-  -- Determine full vs partial publish.
-  -- getPublishedPhotos() counts photos already tracked by this publish service.
-  -- On a first publish it returns 0 (< nPhotos) → isFullPublish = true, which is
-  -- correct: the render loop covers everything.
-  local alreadyPublished = pubCollection and #(pubCollection:getPublishedPhotos() or {}) or 0
-  local isFullPublish    = (nPhotos >= alreadyPublished)
-
   -- Collect render-loop order and key renames for updateOrderJson
   local renderedKeys = {}
   local keyRenames   = {}   -- { [oldKey] = newKey } for photos whose key changed
+  local uuidToNewKey = {}   -- { [uuid]   = newKey } for photos rendered this session
 
   for i, rendition in exportSession:renditions { stopIfCanceled = true } do
     progressScope:setPortionComplete(i - 1, nPhotos)
@@ -298,6 +293,7 @@ local function processRenderedPhotos(functionContext, exportContext)
         keyRenames[oldKey] = key
       end
 
+      if uuid ~= 'nouuid' then uuidToNewKey[uuid] = key end
       table.insert(renderedKeys, key)
 
       progressScope:setCaption('Uploading ' .. filename)
@@ -327,7 +323,7 @@ local function processRenderedPhotos(functionContext, exportContext)
   end
 
   if not progressScope:isCanceled() and #renderedKeys > 0 then
-    updateOrderJson(exportSettings, keyPrefix, collectionName, renderedKeys, keyRenames, isFullPublish)
+    updateOrderJson(exportSettings, keyPrefix, collectionName, renderedKeys, keyRenames, uuidToNewKey, pubCollection)
   end
 
   progressScope:done()
@@ -371,66 +367,83 @@ end
 
 -- ---------------------------------------------------------------------------
 -- Build and upload order.json — called directly from processRenderedPhotos.
--- For a full publish the render-loop order is authoritative.
--- For a partial publish the existing order.json is fetched and patched.
+-- Uses pubCollection:getPublishedPhotos() as the authoritative source of order
+-- so partial re-publishes insert photos at the correct position rather than
+-- appending them. Falls back to renderedKeys when no published photos exist
+-- yet (first publish of a collection).
 -- ---------------------------------------------------------------------------
 
-updateOrderJson = function(publishSettings, prefix, collectionName, renderedKeys, keyRenames, isFullPublish)
-  local finalKeys
+updateOrderJson = function(publishSettings, prefix, collectionName, renderedKeys, keyRenames, uuidToNewKey, pubCollection)
+  local finalKeys = {}
 
-  if isFullPublish then
-    finalKeys = renderedKeys
-  else
-    local orderJson = S3Upload.getContent {
-      key               = prefix .. 'order.json',
-      endpoint          = publishSettings.endpoint,
-      bucket            = publishSettings.bucket,
-      region            = publishSettings.region or 'auto',
-      accessKeyId       = publishSettings.accessKeyId,
-      secretAccessKey   = publishSettings.secretAccessKey,
-      signingHelperPath = signingHelperPath,
-    }
-
-    if not orderJson then
-      finalKeys = renderedKeys
-    else
-      local existingKeys = {}
-      local photosJson   = orderJson:match('"photos"%s*:%s*%[(.-)%]')
-      if photosJson then
-        for k in photosJson:gmatch('"([^"]+)"') do
-          table.insert(existingKeys, k)
-        end
-      end
-
-      local finalSet = {}
-      finalKeys = {}
-
-      for _, k in ipairs(existingKeys) do
-        local newK = keyRenames[k] or k
-        if not finalSet[newK] then
-          finalSet[newK] = true
-          table.insert(finalKeys, newK)
-        end
-      end
-
-      for _, k in ipairs(renderedKeys) do
-        if not finalSet[k] then
-          finalSet[k] = true
-          table.insert(finalKeys, k)
-        end
+  if pubCollection then
+    -- Build uuid → current key: existing remote IDs, overridden by just-rendered keys.
+    local keyByUuid = {}
+    for _, pubPhoto in ipairs(pubCollection:getPublishedPhotos() or {}) do
+      local remoteId = pubPhoto:getRemoteId()
+      if remoteId and remoteId ~= '' then
+        local photo = type(pubPhoto.getPhoto) == 'function' and pubPhoto:getPhoto()
+        local uuid  = photo and photo:getRawMetadata('uuid')
+        if uuid then keyByUuid[uuid] = remoteId end
       end
     end
+    for uuid, key in pairs(uuidToNewKey) do
+      keyByUuid[uuid] = key
+    end
+
+    -- getPhotos() / getPublishedPhotos() both return photos in added order, not the
+    -- collection's display sort. Sort by capture time to match the CaptureTime sort
+    -- setting. For custom-sorted collections imposeSortOrderOnPublishedCollection will
+    -- run after this and overwrite with the correct custom order.
+    local ordered = {}
+    for _, photo in ipairs(pubCollection:getPhotos() or {}) do
+      local uuid = photo:getRawMetadata('uuid')
+      local key  = keyByUuid[uuid]
+      if key and key ~= '' then
+        table.insert(ordered, {
+          key  = keyRenames[key] or key,
+          time = photo:getRawMetadata('dateTimeOriginal') or 0,
+        })
+      end
+    end
+    table.sort(ordered, function(a, b) return a.time < b.time end)
+    for _, item in ipairs(ordered) do
+      table.insert(finalKeys, item.key)
+    end
+  end
+
+  if #finalKeys == 0 then
+    finalKeys = renderedKeys
   end
 
   writeOrderJson(publishSettings, finalKeys, collectionName)
 end
 
 -- ---------------------------------------------------------------------------
--- Impose sort order (called by Lightroom for custom-sorted collections)
--- order.json is already written by processRenderedPhotos; nothing to do here.
+-- Impose sort order — called by Lightroom only for custom-sorted collections,
+-- after processRenderedPhotos completes. Overwrites the capture-time-sorted
+-- order.json produced by processRenderedPhotos with the user's custom order.
 -- ---------------------------------------------------------------------------
 
 local function imposeSortOrderOnPublishedCollection(publishSettings, info)
+  local pubCollection  = info.collection
+  local publishedPhotos = info.publishedPhotos
+  if not publishedPhotos or #publishedPhotos == 0 then return end
+
+  local collectionName = ''
+  if pubCollection then
+    collectionName = (pubCollection:getName() or ''):gsub('[^%w%-_ ]', '_')
+  end
+
+  local finalKeys = {}
+  for _, pubPhoto in ipairs(publishedPhotos) do
+    local key = pubPhoto:getRemoteId()
+    if key and key ~= '' then
+      table.insert(finalKeys, key)
+    end
+  end
+
+  writeOrderJson(publishSettings, finalKeys, collectionName)
 end
 
 -- ---------------------------------------------------------------------------
