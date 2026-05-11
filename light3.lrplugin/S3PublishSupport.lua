@@ -377,26 +377,38 @@ updateOrderJson = function(publishSettings, prefix, collectionName, renderedKeys
   local finalKeys = {}
 
   if pubCollection then
-    -- Build uuid → remoteId for all already-published photos.
-    -- pubPhoto:getPhoto() retrieves the underlying LrPhoto so we can read its UUID.
-    local remoteIdByUuid = {}
+    -- Build uuid → current key: existing remote IDs, overridden by just-rendered keys.
+    local keyByUuid = {}
     for _, pubPhoto in ipairs(pubCollection:getPublishedPhotos() or {}) do
       local remoteId = pubPhoto:getRemoteId()
       if remoteId and remoteId ~= '' then
         local photo = type(pubPhoto.getPhoto) == 'function' and pubPhoto:getPhoto()
         local uuid  = photo and photo:getRawMetadata('uuid')
-        if uuid then remoteIdByUuid[uuid] = remoteId end
+        if uuid then keyByUuid[uuid] = remoteId end
       end
     end
+    for uuid, key in pairs(uuidToNewKey) do
+      keyByUuid[uuid] = key
+    end
 
-    -- Walk photos in the collection's display order (respects CaptureTime, custom sort, etc.)
+    -- getPhotos() / getPublishedPhotos() both return photos in added order, not the
+    -- collection's display sort. Sort by capture time to match the CaptureTime sort
+    -- setting. For custom-sorted collections imposeSortOrderOnPublishedCollection will
+    -- run after this and overwrite with the correct custom order.
+    local ordered = {}
     for _, photo in ipairs(pubCollection:getPhotos() or {}) do
       local uuid = photo:getRawMetadata('uuid')
-      -- Prefer the key we just uploaded; fall back to the photo's existing remote ID.
-      local key = uuidToNewKey[uuid] or remoteIdByUuid[uuid]
+      local key  = keyByUuid[uuid]
       if key and key ~= '' then
-        table.insert(finalKeys, keyRenames[key] or key)
+        table.insert(ordered, {
+          key  = keyRenames[key] or key,
+          time = photo:getRawMetadata('dateTimeOriginal') or 0,
+        })
       end
+    end
+    table.sort(ordered, function(a, b) return a.time < b.time end)
+    for _, item in ipairs(ordered) do
+      table.insert(finalKeys, item.key)
     end
   end
 
@@ -408,11 +420,30 @@ updateOrderJson = function(publishSettings, prefix, collectionName, renderedKeys
 end
 
 -- ---------------------------------------------------------------------------
--- Impose sort order (called by Lightroom for custom-sorted collections)
--- order.json is already written by processRenderedPhotos; nothing to do here.
+-- Impose sort order — called by Lightroom only for custom-sorted collections,
+-- after processRenderedPhotos completes. Overwrites the capture-time-sorted
+-- order.json produced by processRenderedPhotos with the user's custom order.
 -- ---------------------------------------------------------------------------
 
 local function imposeSortOrderOnPublishedCollection(publishSettings, info)
+  local pubCollection  = info.collection
+  local publishedPhotos = info.publishedPhotos
+  if not publishedPhotos or #publishedPhotos == 0 then return end
+
+  local collectionName = ''
+  if pubCollection then
+    collectionName = (pubCollection:getName() or ''):gsub('[^%w%-_ ]', '_')
+  end
+
+  local finalKeys = {}
+  for _, pubPhoto in ipairs(publishedPhotos) do
+    local key = pubPhoto:getRemoteId()
+    if key and key ~= '' then
+      table.insert(finalKeys, key)
+    end
+  end
+
+  writeOrderJson(publishSettings, finalKeys, collectionName)
 end
 
 -- ---------------------------------------------------------------------------
