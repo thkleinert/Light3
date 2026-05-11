@@ -273,6 +273,7 @@ local function processRenderedPhotos(functionContext, exportContext)
   -- Collect render-loop order and key renames for updateOrderJson
   local renderedKeys = {}
   local keyRenames   = {}   -- { [oldKey] = newKey } for photos whose key changed
+  local uuidToNewKey = {}   -- { [uuid]   = newKey } for photos rendered this session
 
   for i, rendition in exportSession:renditions { stopIfCanceled = true } do
     progressScope:setPortionComplete(i - 1, nPhotos)
@@ -292,6 +293,7 @@ local function processRenderedPhotos(functionContext, exportContext)
         keyRenames[oldKey] = key
       end
 
+      if uuid ~= 'nouuid' then uuidToNewKey[uuid] = key end
       table.insert(renderedKeys, key)
 
       progressScope:setCaption('Uploading ' .. filename)
@@ -321,7 +323,7 @@ local function processRenderedPhotos(functionContext, exportContext)
   end
 
   if not progressScope:isCanceled() and #renderedKeys > 0 then
-    updateOrderJson(exportSettings, keyPrefix, collectionName, renderedKeys, keyRenames, pubCollection)
+    updateOrderJson(exportSettings, keyPrefix, collectionName, renderedKeys, keyRenames, uuidToNewKey, pubCollection)
   end
 
   progressScope:done()
@@ -371,36 +373,38 @@ end
 -- yet (first publish of a collection).
 -- ---------------------------------------------------------------------------
 
-updateOrderJson = function(publishSettings, prefix, collectionName, renderedKeys, keyRenames, pubCollection)
+updateOrderJson = function(publishSettings, prefix, collectionName, renderedKeys, keyRenames, uuidToNewKey, pubCollection)
   local finalKeys = {}
 
-  local dbg = function(msg)
-    LrTasks.execute("echo '" .. os.date('%H:%M:%S') .. " " .. msg:gsub("'", "") .. "' >> /tmp/light3_order.log 2>&1")
-  end
-
-  dbg('updateOrderJson called renderedKeys=' .. #renderedKeys .. ' pubCollection=' .. tostring(pubCollection ~= nil))
-
   if pubCollection then
-    local publishedPhotos = pubCollection:getPublishedPhotos() or {}
-    dbg('getPublishedPhotos count=' .. #publishedPhotos)
-    for _, pubPhoto in ipairs(publishedPhotos) do
-      local key = pubPhoto:getRemoteId()
-      dbg('  getRemoteId=' .. tostring(key))
+    -- Build uuid → remoteId for all already-published photos.
+    -- pubPhoto:getPhoto() retrieves the underlying LrPhoto so we can read its UUID.
+    local remoteIdByUuid = {}
+    for _, pubPhoto in ipairs(pubCollection:getPublishedPhotos() or {}) do
+      local remoteId = pubPhoto:getRemoteId()
+      if remoteId and remoteId ~= '' then
+        local photo = type(pubPhoto.getPhoto) == 'function' and pubPhoto:getPhoto()
+        local uuid  = photo and photo:getRawMetadata('uuid')
+        if uuid then remoteIdByUuid[uuid] = remoteId end
+      end
+    end
+
+    -- Walk photos in the collection's display order (respects CaptureTime, custom sort, etc.)
+    for _, photo in ipairs(pubCollection:getPhotos() or {}) do
+      local uuid = photo:getRawMetadata('uuid')
+      -- Prefer the key we just uploaded; fall back to the photo's existing remote ID.
+      local key = uuidToNewKey[uuid] or remoteIdByUuid[uuid]
       if key and key ~= '' then
         table.insert(finalKeys, keyRenames[key] or key)
       end
     end
   end
 
-  dbg('finalKeys before fallback=' .. #finalKeys)
-
   if #finalKeys == 0 then
     finalKeys = renderedKeys
   end
 
-  dbg('writing order.json with ' .. #finalKeys .. ' keys')
   writeOrderJson(publishSettings, finalKeys, collectionName)
-  dbg('writeOrderJson returned')
 end
 
 -- ---------------------------------------------------------------------------
