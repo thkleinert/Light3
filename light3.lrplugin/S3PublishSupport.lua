@@ -454,8 +454,7 @@ local function deletePhotosFromPublishedCollection(publishSettings, arrayOfPhoto
   -- Build a set of deleted IDs for fast lookup
   local deleted = {}
   for _, photoId in ipairs(arrayOfPhotoIds) do
-    deleted[photoId] = true
-    S3Upload.delete {
+    local ok, err = S3Upload.delete {
       key               = photoId,
       endpoint          = publishSettings.endpoint,
       bucket            = publishSettings.bucket,
@@ -464,7 +463,12 @@ local function deletePhotosFromPublishedCollection(publishSettings, arrayOfPhoto
       secretAccessKey   = publishSettings.secretAccessKey,
       signingHelperPath = signingHelperPath,
     }
-    if deletedCallback then deletedCallback(photoId) end
+    if ok then
+      deleted[photoId] = true
+      if deletedCallback then deletedCallback(photoId) end
+    else
+      LrDialogs.message('Light3: delete failed', err or 'unknown error', 'critical')
+    end
   end
 
   -- Refresh order.json by reading existing file, filtering out deleted keys.
