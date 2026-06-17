@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/thkleinert/Light3/compare/v1.2.0...v1.2.1) (2026-05-11)
+
+
+### Bug Fixes
+
+* rebuild order.json from collection order on partial re-publish ([#19](https://github.com/thkleinert/Light3/issues/19)) ([9bc73b2](https://github.com/thkleinert/Light3/commit/9bc73b2a5b88050a1676460bd1d8b244b2ad59fe))
+
 ## [1.2.0](https://github.com/thkleinert/Light3/compare/v1.1.0...v1.2.0) (2026-05-05)
 
 
