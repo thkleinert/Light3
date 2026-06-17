@@ -14,8 +14,8 @@ return {
   VERSION = {
     major    = 1,  -- x-release-please-major
     minor    = 2,  -- x-release-please-minor
-    revision = 1,  -- x-release-please-patch
-    display  = '1.2.1',  -- x-release-please-version
+    revision = 2,  -- x-release-please-patch
+    display  = '1.2.2',  -- x-release-please-version
   },
 
   LrExportServiceProvider = {

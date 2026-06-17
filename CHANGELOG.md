@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/thkleinert/Light3/compare/v1.2.1...v1.2.2) (2026-06-17)
+
+
+### Bug Fixes
+
+* order.json sort order and deletion crash ([#21](https://github.com/thkleinert/Light3/issues/21)) ([f2ef1f5](https://github.com/thkleinert/Light3/commit/f2ef1f5cb8a4013f74e1cc217fdaa68d13eb3754))
+
 ## [1.2.1](https://github.com/thkleinert/Light3/compare/v1.2.0...v1.2.1) (2026-05-11)
 
 
