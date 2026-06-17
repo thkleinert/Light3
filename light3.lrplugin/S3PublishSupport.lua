@@ -450,7 +450,7 @@ end
 -- Delete published photos
 -- ---------------------------------------------------------------------------
 
-local function deletePhotosFromPublishedCollection(functionContext, publishSettings, arrayOfPhotoIds)
+local function deletePhotosFromPublishedCollection(publishSettings, arrayOfPhotoIds, deletedCallback)
   -- Build a set of deleted IDs for fast lookup
   local deleted = {}
   for _, photoId in ipairs(arrayOfPhotoIds) do
@@ -464,6 +464,7 @@ local function deletePhotosFromPublishedCollection(functionContext, publishSetti
       secretAccessKey   = publishSettings.secretAccessKey,
       signingHelperPath = signingHelperPath,
     }
+    if deletedCallback then deletedCallback(photoId) end
   end
 
   -- Refresh order.json by reading existing file, filtering out deleted keys.
