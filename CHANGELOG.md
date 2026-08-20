@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.3](https://github.com/thkleinert/Light3/compare/v1.2.2...v1.2.3) (2026-08-20)
+
+
+### Bug Fixes
+
+* attach the plugin zip to releases again ([#26](https://github.com/thkleinert/Light3/issues/26)) ([8727801](https://github.com/thkleinert/Light3/commit/87278019974e6fc92f0aba06b573a261428306a3))
+* upload the release asset by tag instead of by GITHUB_REF ([#28](https://github.com/thkleinert/Light3/issues/28)) ([6addea6](https://github.com/thkleinert/Light3/commit/6addea63f7a193f066d74754987bae921daf21bb))
+
 ## [1.2.2](https://github.com/thkleinert/Light3/compare/v1.2.1...v1.2.2) (2026-08-20)
 
 
