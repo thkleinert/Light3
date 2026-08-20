@@ -234,7 +234,7 @@ Light3/
 │   └── go.sum
 └── .github/workflows/
     ├── release-please.yml      # Automates Release PRs and versioning
-    └── release.yml             # Builds binary + zips plugin on release
+    └── release.yml             # Called by release-please: builds binary + attaches plugin zip
 ```
 
 ---

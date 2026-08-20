@@ -1,16 +1,48 @@
 name: Build and attach release artifact
 
+# Callable two ways:
+#   - from release-please.yml, immediately after it publishes a release
+#   - manually, to backfill a release whose artifact is missing
+#
+# Deliberately NOT triggered by `release: published`. Release Please publishes
+# under the default GITHUB_TOKEN, and GitHub does not start workflow runs from
+# GITHUB_TOKEN events, so that trigger never fired - which is why every release
+# up to and including v1.2.2 shipped with no plugin zip attached.
+
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag of the release to build and attach the plugin zip to
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag of an existing release to backfill, e.g. v1.2.2
+        required: true
+        type: string
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: macos-latest
 
     steps:
+      - name: Verify a tag was supplied
+        run: |
+          if [ -z "${{ inputs.tag }}" ]; then
+            echo "::error::No tag supplied. Refusing to build an unlabelled artifact."
+            exit 1
+          fi
+          echo "Building artifact for ${{ inputs.tag }}"
+
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -28,10 +60,10 @@ jobs:
       - name: Bundle plugin
         run: |
           cp signing-helper-go/dist/light3-sign light3.lrplugin/light3-sign
-          VERSION="${{ github.event.release.tag_name }}"
-          zip -r "light3-${VERSION}.lrplugin.zip" light3.lrplugin
+          zip -r "light3-${{ inputs.tag }}.lrplugin.zip" light3.lrplugin
 
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.tag }}
           files: light3-*.lrplugin.zip
