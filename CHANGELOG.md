@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.2](https://github.com/thkleinert/Light3/compare/v1.2.1...v1.2.2) (2026-08-20)
+
+
+### Bug Fixes
+
+* only call deletedCallback and update order.json after confirmed S3 delete ([#23](https://github.com/thkleinert/Light3/issues/23)) ([acb4aad](https://github.com/thkleinert/Light3/commit/acb4aadfe307e5baaf11af89d779bca731373520))
+* order.json sort order and deletion crash ([#21](https://github.com/thkleinert/Light3/issues/21)) ([f2ef1f5](https://github.com/thkleinert/Light3/commit/f2ef1f5cb8a4013f74e1cc217fdaa68d13eb3754))
+* read custom sort order from the remoteIdSequence argument ([#24](https://github.com/thkleinert/Light3/issues/24)) ([57ddcb7](https://github.com/thkleinert/Light3/commit/57ddcb7daed67a718d33e09c18100c272b248789))
+
 ## [1.2.1](https://github.com/thkleinert/Light3/compare/v1.2.0...v1.2.1) (2026-05-11)
 
 
