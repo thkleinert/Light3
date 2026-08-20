@@ -423,24 +423,39 @@ end
 -- Impose sort order — called by Lightroom only for custom-sorted collections,
 -- after processRenderedPhotos completes. Overwrites the capture-time-sorted
 -- order.json produced by processRenderedPhotos with the user's custom order.
+--
+-- The SDK signature is (publishSettings, info, remoteIdSequence). The custom
+-- order arrives in the THIRD argument: an array of the ids recorded via
+-- rendition:recordPublishedPhotoId, which for Light3 are the S3 keys already
+-- in the user's order. `info` carries collection identity (remoteCollectionId
+-- and friends), not the photos — an earlier version read info.publishedPhotos,
+-- which is always nil, so this callback returned without writing anything and
+-- custom order never reached order.json.
 -- ---------------------------------------------------------------------------
 
-local function imposeSortOrderOnPublishedCollection(publishSettings, info)
-  local pubCollection  = info.collection
-  local publishedPhotos = info.publishedPhotos
-  if not publishedPhotos or #publishedPhotos == 0 then return end
-
-  local collectionName = ''
-  if pubCollection then
-    collectionName = (pubCollection:getName() or ''):gsub('[^%w%-_ ]', '_')
-  end
+local function imposeSortOrderOnPublishedCollection(publishSettings, info, remoteIdSequence)
+  if not remoteIdSequence or #remoteIdSequence == 0 then return end
 
   local finalKeys = {}
-  for _, pubPhoto in ipairs(publishedPhotos) do
-    local key = pubPhoto:getRemoteId()
-    if key and key ~= '' then
+  for _, remoteId in ipairs(remoteIdSequence) do
+    -- The SDK permits string or number ids; Light3 records S3 keys as strings.
+    local key = tostring(remoteId or '')
+    if key ~= '' then
       table.insert(finalKeys, key)
     end
+  end
+  if #finalKeys == 0 then return end
+
+  -- info does not reliably carry a collection object, so fall back to the
+  -- directory segment of the key prefix, which is how the collection is named
+  -- in the bucket anyway.
+  local collectionName = ''
+  local pubCollection = info and (info.publishedCollection or info.collection)
+  if pubCollection and type(pubCollection.getName) == 'function' then
+    collectionName = (pubCollection:getName() or ''):gsub('[^%w%-_ ]', '_')
+  end
+  if collectionName == '' then
+    collectionName = finalKeys[1]:match('([^/]+)/[^/]*$') or ''
   end
 
   writeOrderJson(publishSettings, finalKeys, collectionName)
