@@ -12,8 +12,25 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           config-file: .github/release-please-config.json
           manifest-file: .github/.release-please-manifest.json
+
+  # Build the plugin zip here rather than from a `release: published` trigger.
+  # The release above is published using GITHUB_TOKEN, and GitHub does not
+  # start new workflow runs from GITHUB_TOKEN events, so that trigger never
+  # fires. Calling the build directly keeps it on one token and needs no PAT.
+  build-artifact:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    uses: ./.github/workflows/release.yml
+    permissions:
+      contents: write
+    with:
+      tag: ${{ needs.release-please.outputs.tag_name }}
