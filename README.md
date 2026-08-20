@@ -144,7 +144,13 @@ Example `order.json` for a collection at `Weddings/Smith_2026/`:
 }
 ```
 
-`order.json` is updated on every publish, including when photos are removed. If you reorder photos without changing any images, just click **Publish** to push the updated order without re-uploading any files.
+`order.json` is updated on every publish, including when photos are removed.
+
+#### Pushing a new order without re-uploading
+
+Reordering photos does not mark anything as modified, so the **Publish** button stays inactive. To push the new order, right-click the published collection and choose **Publish Now**. This runs a publish cycle with nothing to render — no image is re-uploaded — and Light3 rewrites `order.json` alone.
+
+Avoid *Mark to Republish* for a pure reorder: it flags every photo as modified, so Lightroom re-renders and re-uploads the whole collection just to rewrite a small JSON file.
 
 ### Re-publishing
 

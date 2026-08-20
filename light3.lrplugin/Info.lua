@@ -23,11 +23,4 @@ return {
     file  = 'S3PublishSupport.lua',
   },
 
-  LrLibraryMenuItems = {
-    {
-      title = 'Sync order',
-      file  = 'SyncOrder.lua',
-    },
-  },
-
 }
