@@ -575,13 +575,13 @@
       <div class="workflow-step">
         <span class="workflow-step-label">Step 1</span>
         <span class="workflow-step-title">Curate in Lightroom</span>
-        <span class="workflow-step-desc">Organize photos into published collections. Drag to reorder. Rate and cull as usual.</span>
+        <span class="workflow-step-desc">Organize photos into published collections. Set the collection sort to <strong>Custom Order</strong> and drag to arrange. Rate and cull as usual.</span>
         <span class="workflow-arrow">→</span>
       </div>
       <div class="workflow-step">
         <span class="workflow-step-label">Step 2</span>
         <span class="workflow-step-title">Publish to S3</span>
-        <span class="workflow-step-desc">Click Publish. Light3 uploads only changed photos and writes an <code>order.json</code> sidecar per collection.</span>
+        <span class="workflow-step-desc">Click Publish. Light3 uploads only changed photos and writes an <code>order.json</code> sidecar per collection. Reordering alone leaves the Publish button inactive &mdash; right-click the collection and choose <strong>Publish&nbsp;Now</strong> to push a new order without re-uploading a single image.</span>
         <span class="workflow-arrow">→</span>
       </div>
       <div class="workflow-step">
@@ -713,7 +713,7 @@
       <div class="feature">
         <div class="feature-icon">📋</div>
         <h3>order.json sidecar</h3>
-        <p>After every publish, Light3 writes a JSON file with the full ordered list of photo keys. Your gallery or static site generator can read it to display photos in exactly the order you set in Lightroom. Supports <strong>Capture Time</strong> and <strong>Custom Order</strong> (drag-and-drop) sort modes.</p>
+        <p>After every publish, Light3 writes a JSON file with the full ordered list of photo keys. Your gallery or static site generator can read it to display photos in exactly the order you set in Lightroom. Collections sorted by <strong>Capture Time</strong> are ordered by EXIF date; set a collection to <strong>Custom Order</strong> to have your drag-and-drop arrangement recorded instead. Requires v1.2.3 or later.</p>
       </div>
       <div class="feature">
         <div class="feature-icon">🔒</div>
