@@ -102,6 +102,40 @@ For example, with collection set `Weddings` and collection `Smith 2026`:
 my-photos/Weddings/Smith_2026/00001_Smith_2026.jpg
 ```
 
+### Storage layout
+
+By default Light3 mirrors the collection hierarchy as S3 path segments, and writes each collection's `order.json` alongside its images. A photo belonging to two collections is uploaded twice, to two prefixes.
+
+Tick **Store all images in one prefix (flat)** to keep a single copy of every photo instead:
+
+```
+nested (default)                      flat
+  Collections/Metropolitan/             images/
+    <uuid>.jpg                            <uuid>.jpg          one object per photo
+    order.json                          manifests/
+                                          Collections/Metropolitan.json
+```
+
+The manifest has to move because flat images no longer say which collection they belong to — every collection would otherwise write to the same `order.json`. Its path comes from **Manifest prefix** plus the collection's position in the hierarchy, so collections and collection sets are still organised exactly as before. **Nothing changes in Lightroom.**
+
+Flat storage suits libraries where thematic collections are curated out of larger ones, so the same photo appears in several. Besides the storage saving, it removes a consistency trap: with per-collection prefixes the same photo exists as several independent exports, and re-editing it then publishing only one collection leaves the copies silently different.
+
+**Removing a photo behaves differently.** In flat mode a single object can back several collections, so removing a photo from a collection drops it from that collection's manifest but does **not** delete the object. Objects no longer referenced by any manifest have to be collected separately — compare the image prefix against the union of all manifests.
+
+#### Switching an existing service to flat storage
+
+Changing the layout changes every key, but Lightroom does not know that. It tracks each photo by the key it last published, and changing a setting marks nothing as modified.
+
+**Publish Now will not move anything.** It rewrites the manifest from the keys Lightroom already recorded, so you end up with the manifest in its new location still pointing at the old image paths.
+
+To actually move the images:
+
+1. Set **Key prefix** first — something like `images/`. Flat storage drops the collection path, so with an empty prefix every photo lands at the bucket root, mixed in with your existing prefixes.
+2. Select every photo in the collection, right-click, **Mark to Republish**.
+3. Click **Publish**. The photos are re-rendered, uploaded under the new keys, and Lightroom records them.
+
+The objects at the old prefix are left in place. Nothing references them once the manifest is rewritten, so remove them after confirming the new layout looks right.
+
 ### File naming
 
 The **File naming** field in the service settings is a free-form template. Click the token buttons to insert:
