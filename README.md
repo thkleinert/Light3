@@ -102,6 +102,28 @@ For example, with collection set `Weddings` and collection `Smith 2026`:
 my-photos/Weddings/Smith_2026/00001_Smith_2026.jpg
 ```
 
+### Storage layout
+
+By default Light3 mirrors the collection hierarchy as S3 path segments, and writes each collection's `order.json` alongside its images. A photo belonging to two collections is uploaded twice, to two prefixes.
+
+Tick **Store all images in one prefix (flat)** to keep a single copy of every photo instead:
+
+```
+nested (default)                      flat
+  Collections/Metropolitan/             images/
+    <uuid>.jpg                            <uuid>.jpg          one object per photo
+    order.json                          manifests/
+                                          Collections/Metropolitan.json
+```
+
+The manifest has to move because flat images no longer say which collection they belong to — every collection would otherwise write to the same `order.json`. Its path comes from **Manifest prefix** plus the collection's position in the hierarchy, so collections and collection sets are still organised exactly as before. **Nothing changes in Lightroom.**
+
+Flat storage suits libraries where thematic collections are curated out of larger ones, so the same photo appears in several. Besides the storage saving, it removes a consistency trap: with per-collection prefixes the same photo exists as several independent exports, and re-editing it then publishing only one collection leaves the copies silently different.
+
+**Removing a photo behaves differently.** In flat mode a single object can back several collections, so removing a photo from a collection drops it from that collection's manifest but does **not** delete the object. Objects no longer referenced by any manifest have to be collected separately — compare the image prefix against the union of all manifests.
+
+Switching an existing service between layouts changes every key, so Lightroom loses track of what it published. Republish each collection once after changing it.
+
 ### File naming
 
 The **File naming** field in the service settings is a free-form template. Click the token buttons to insert:

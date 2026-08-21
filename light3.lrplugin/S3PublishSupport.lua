@@ -46,6 +46,66 @@ local function collectionSetPath(collection)
 end
 
 -- ---------------------------------------------------------------------------
+-- Full path of a collection within the service, e.g. 'Collections/Metropolitan'.
+-- Names the manifest, and in nested mode is also the image prefix.
+-- ---------------------------------------------------------------------------
+
+local function collectionPathFor(collection)
+  if not collection then return '' end
+  local setPath = collectionSetPath(collection)
+  local name    = (collection:getName() or ''):gsub('[^%w%-_ ]', '_')
+  if setPath ~= '' and name ~= '' then return setPath .. '/' .. name end
+  return name ~= '' and name or setPath
+end
+
+-- Same, rebuilt from the `info` table handed to collection callbacks, which
+-- carries `parents` and `name` rather than a collection object.
+local function collectionPathFromInfo(info)
+  if not info then return '' end
+  local parts = {}
+  for _, parent in ipairs(info.parents or {}) do
+    local n = (parent.name or ''):gsub('[^%w%-_ ]', '_')
+    if n ~= '' then table.insert(parts, n) end
+  end
+  local n = (info.name or ''):gsub('[^%w%-_ ]', '_')
+  if n ~= '' then table.insert(parts, n) end
+  return table.concat(parts, '/')
+end
+
+-- ---------------------------------------------------------------------------
+-- Where images and the manifest live. Returns imagePrefix, manifestKey.
+--
+--   nested (default) images  <keyPrefix><collectionPath>/
+--                    manifest <keyPrefix><collectionPath>/order.json
+--
+--   flat             images  <keyPrefix>
+--                    manifest <manifestPrefix><collectionPath>.json
+--
+-- Flat storage keeps one object per photo no matter how many collections use
+-- it, so the manifest cannot live alongside the images - every collection
+-- would write to the same key.
+-- ---------------------------------------------------------------------------
+
+local function storageLayout(settings, collectionPath)
+  local keyPrefix = LrStringUtils.trimWhitespace(settings.keyPrefix or '')
+  if keyPrefix ~= '' and keyPrefix:sub(-1) ~= '/' then
+    keyPrefix = keyPrefix .. '/'
+  end
+
+  if settings.flatStorage then
+    local manifestPrefix = LrStringUtils.trimWhitespace(settings.manifestPrefix or '')
+    if manifestPrefix == '' then manifestPrefix = 'manifests/' end
+    if manifestPrefix:sub(-1) ~= '/' then manifestPrefix = manifestPrefix .. '/' end
+    local name = collectionPath ~= '' and collectionPath or 'collection'
+    return keyPrefix, manifestPrefix .. name .. '.json'
+  end
+
+  local imagePrefix = keyPrefix
+  if collectionPath ~= '' then imagePrefix = imagePrefix .. collectionPath .. '/' end
+  return imagePrefix, imagePrefix .. 'order.json'
+end
+
+-- ---------------------------------------------------------------------------
 -- Filename template engine
 -- ---------------------------------------------------------------------------
 
@@ -161,6 +221,24 @@ local function sectionsForTopOfDialog(f, propertyTable)
           },
         },
 
+        -- Flat storage
+        f:row {
+          f:static_text { title = '', width = 120 },
+          f:checkbox {
+            title = 'Store all images in one prefix (flat)',
+            value = bind 'flatStorage',
+          },
+        },
+        f:row {
+          f:static_text { title = 'Manifest prefix', width = 120 },
+          f:edit_field {
+            value = bind 'manifestPrefix',
+            width_in_chars = 30,
+            placeholder_string = 'manifests/',
+            enabled = bind 'flatStorage',
+          },
+        },
+
         -- File naming template
         f:separator { fill_horizontal = 1 },
         f:row {
@@ -244,31 +322,16 @@ local function processRenderedPhotos(functionContext, exportContext)
   end
 
   local bucket      = LrStringUtils.trimWhitespace(exportSettings.bucket)
-  local keyPrefix   = LrStringUtils.trimWhitespace(exportSettings.keyPrefix or '')
   local fileNamingTemplate = exportSettings.fileNamingTemplate or '<file>'
-  -- Normalise prefix: ensure trailing slash if non-empty
-  if keyPrefix ~= '' and keyPrefix:sub(-1) ~= '/' then
-    keyPrefix = keyPrefix .. '/'
-  end
 
-  -- Build the S3 prefix from the full collection set hierarchy + collection name
-  -- e.g.  keyPrefix / Travel/2024/Summer / Beach /
-  local collectionName = ''
   local pubCollection  = exportContext.publishedCollection
-  if pubCollection then
-    -- Parent collection sets (may be empty if collection is at the root)
-    local setPath = collectionSetPath(pubCollection)
-    if setPath ~= '' then
-      keyPrefix = keyPrefix .. setPath .. '/'
-    end
+  local collectionPath = collectionPathFor(pubCollection)
+  local collectionName = collectionPath:match('([^/]+)$') or ''
+  local keyPrefix, manifestKey = storageLayout(exportSettings, collectionPath)
 
-    -- The collection itself
-    collectionName = pubCollection:getName() or ''
-    collectionName = collectionName:gsub('[^%w%-_ ]', '_')
-    if collectionName ~= '' then
-      keyPrefix = keyPrefix .. collectionName .. '/'
-    end
-  end
+  -- Record the collection path as the remote collection id so the sort-order
+  -- callback can find the manifest without rebuilding the path from `info`.
+  pcall(function() exportSession:recordRemoteCollectionId(collectionPath) end)
 
   -- Collect render-loop order and key renames for updateOrderJson
   local renderedKeys = {}
@@ -323,7 +386,7 @@ local function processRenderedPhotos(functionContext, exportContext)
   end
 
   if not progressScope:isCanceled() and #renderedKeys > 0 then
-    updateOrderJson(exportSettings, keyPrefix, collectionName, renderedKeys, keyRenames, uuidToNewKey, pubCollection)
+    updateOrderJson(exportSettings, manifestKey, collectionName, renderedKeys, keyRenames, uuidToNewKey, pubCollection)
   end
 
   progressScope:done()
@@ -333,8 +396,9 @@ end
 -- Write an ordered list of S3 keys as order.json to the bucket.
 -- ---------------------------------------------------------------------------
 
-local function writeOrderJson(publishSettings, orderedKeys, collectionName)
+local function writeOrderJson(publishSettings, orderedKeys, collectionName, manifestKey)
   if not orderedKeys or #orderedKeys == 0 then return end
+  if not manifestKey or manifestKey == '' then return end
 
   local prefix = orderedKeys[1]:match('^(.*/)') or ''
 
@@ -352,7 +416,7 @@ local function writeOrderJson(publishSettings, orderedKeys, collectionName)
 
   local ok, err = S3Upload.putContent {
     content           = json,
-    key               = prefix .. 'order.json',
+    key               = manifestKey,
     endpoint          = publishSettings.endpoint,
     bucket            = publishSettings.bucket,
     region            = publishSettings.region or 'auto',
@@ -373,7 +437,7 @@ end
 -- yet (first publish of a collection).
 -- ---------------------------------------------------------------------------
 
-updateOrderJson = function(publishSettings, prefix, collectionName, renderedKeys, keyRenames, uuidToNewKey, pubCollection)
+updateOrderJson = function(publishSettings, manifestKey, collectionName, renderedKeys, keyRenames, uuidToNewKey, pubCollection)
   local finalKeys = {}
 
   if pubCollection then
@@ -416,7 +480,7 @@ updateOrderJson = function(publishSettings, prefix, collectionName, renderedKeys
     finalKeys = renderedKeys
   end
 
-  writeOrderJson(publishSettings, finalKeys, collectionName)
+  writeOrderJson(publishSettings, finalKeys, collectionName, manifestKey)
 end
 
 -- ---------------------------------------------------------------------------
@@ -446,52 +510,74 @@ local function imposeSortOrderOnPublishedCollection(publishSettings, info, remot
   end
   if #finalKeys == 0 then return end
 
-  -- info does not reliably carry a collection object, so fall back to the
-  -- directory segment of the key prefix, which is how the collection is named
-  -- in the bucket anyway.
-  local collectionName = ''
-  local pubCollection = info and (info.publishedCollection or info.collection)
-  if pubCollection and type(pubCollection.getName) == 'function' then
-    collectionName = (pubCollection:getName() or ''):gsub('[^%w%-_ ]', '_')
-  end
-  if collectionName == '' then
-    collectionName = finalKeys[1]:match('([^/]+)/[^/]*$') or ''
-  end
+  -- `info` carries no collection object, so the path comes from the remote
+  -- collection id recorded during publish, falling back to info.parents/name.
+  local collectionPath = tostring((info and info.remoteCollectionId) or '')
+  if collectionPath == '' then collectionPath = collectionPathFromInfo(info) end
 
-  writeOrderJson(publishSettings, finalKeys, collectionName)
+  local _, manifestKey = storageLayout(publishSettings, collectionPath)
+  local collectionName = collectionPath:match('([^/]+)$') or ''
+
+  writeOrderJson(publishSettings, finalKeys, collectionName, manifestKey)
 end
 
 -- ---------------------------------------------------------------------------
 -- Delete published photos
 -- ---------------------------------------------------------------------------
 
-local function deletePhotosFromPublishedCollection(publishSettings, arrayOfPhotoIds, deletedCallback)
+local function deletePhotosFromPublishedCollection(publishSettings, arrayOfPhotoIds, deletedCallback, localCollectionId)
+  -- The SDK passes the local collection id; it is the only way to find the
+  -- manifest once image keys no longer encode which collection they belong to.
+  local collectionPath = ''
+  if localCollectionId then
+    local ok, coll = pcall(function()
+      return LrApplication.activeCatalog():getPublishedCollectionByLocalIdentifier(localCollectionId)
+    end)
+    if ok and coll then collectionPath = collectionPathFor(coll) end
+  end
+  local _, manifestKey = storageLayout(publishSettings, collectionPath)
+
   -- Build a set of deleted IDs for fast lookup
   local deleted = {}
   for _, photoId in ipairs(arrayOfPhotoIds) do
-    local ok, err = S3Upload.delete {
-      key               = photoId,
-      endpoint          = publishSettings.endpoint,
-      bucket            = publishSettings.bucket,
-      region            = publishSettings.region or 'auto',
-      accessKeyId       = publishSettings.accessKeyId,
-      secretAccessKey   = publishSettings.secretAccessKey,
-      signingHelperPath = signingHelperPath,
-    }
-    if ok then
+    if publishSettings.flatStorage then
+      -- One object can back several collections, so removing a photo from a
+      -- collection must not delete the shared object - it only drops out of
+      -- this collection's manifest. Orphans are collected separately.
       deleted[photoId] = true
       if deletedCallback then deletedCallback(photoId) end
     else
-      LrDialogs.message('Light3: delete failed', err or 'unknown error', 'critical')
+      local ok, err = S3Upload.delete {
+        key               = photoId,
+        endpoint          = publishSettings.endpoint,
+        bucket            = publishSettings.bucket,
+        region            = publishSettings.region or 'auto',
+        accessKeyId       = publishSettings.accessKeyId,
+        secretAccessKey   = publishSettings.secretAccessKey,
+        signingHelperPath = signingHelperPath,
+      }
+      if ok then
+        deleted[photoId] = true
+        if deletedCallback then deletedCallback(photoId) end
+      else
+        LrDialogs.message('Light3: delete failed', err or 'unknown error', 'critical')
+      end
     end
   end
 
-  -- Refresh order.json by reading existing file, filtering out deleted keys.
-  local sampleKey = arrayOfPhotoIds[1]
-  if sampleKey then
-    local prefix    = sampleKey:match('^(.*/)') or ''
+  -- If the collection could not be resolved, fall back to deriving the
+  -- manifest location from a deleted key, which works in nested mode.
+  if collectionPath == '' and not publishSettings.flatStorage then
+    local sampleKey = arrayOfPhotoIds[1]
+    if sampleKey then
+      manifestKey = (sampleKey:match('^(.*/)') or '') .. 'order.json'
+    end
+  end
+
+  -- Refresh the manifest by reading it back and filtering out deleted keys.
+  if manifestKey and manifestKey ~= '' then
     local orderJson = S3Upload.getContent {
-      key               = prefix .. 'order.json',
+      key               = manifestKey,
       endpoint          = publishSettings.endpoint,
       bucket            = publishSettings.bucket,
       region            = publishSettings.region or 'auto',
@@ -511,7 +597,7 @@ local function deletePhotosFromPublishedCollection(publishSettings, arrayOfPhoto
           end
         end
       end
-      writeOrderJson(publishSettings, remainingKeys, collectionName)
+      writeOrderJson(publishSettings, remainingKeys, collectionName, manifestKey)
     end
   end
 end
@@ -544,6 +630,8 @@ return {
     { key = 'secretAccessKey',    default = '' },
     { key = 'keyPrefix',          default = '' },
     { key = 'fileNamingTemplate', default = '<file>' },
+    { key = 'flatStorage',        default = false },
+    { key = 'manifestPrefix',     default = 'manifests/' },
   },
 
   -- Core publish callbacks
