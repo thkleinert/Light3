@@ -122,7 +122,19 @@ Flat storage suits libraries where thematic collections are curated out of large
 
 **Removing a photo behaves differently.** In flat mode a single object can back several collections, so removing a photo from a collection drops it from that collection's manifest but does **not** delete the object. Objects no longer referenced by any manifest have to be collected separately — compare the image prefix against the union of all manifests.
 
-Switching an existing service between layouts changes every key, so Lightroom loses track of what it published. Republish each collection once after changing it.
+#### Switching an existing service to flat storage
+
+Changing the layout changes every key, but Lightroom does not know that. It tracks each photo by the key it last published, and changing a setting marks nothing as modified.
+
+**Publish Now will not move anything.** It rewrites the manifest from the keys Lightroom already recorded, so you end up with the manifest in its new location still pointing at the old image paths.
+
+To actually move the images:
+
+1. Set **Key prefix** first — something like `images/`. Flat storage drops the collection path, so with an empty prefix every photo lands at the bucket root, mixed in with your existing prefixes.
+2. Select every photo in the collection, right-click, **Mark to Republish**.
+3. Click **Publish**. The photos are re-rendered, uploaded under the new keys, and Lightroom records them.
+
+The objects at the old prefix are left in place. Nothing references them once the manifest is rewritten, so remove them after confirming the new layout looks right.
 
 ### File naming
 
