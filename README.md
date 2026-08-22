@@ -1,17 +1,46 @@
-# Light3
+<p align="center">
+  <img src="docs/logo.svg" width="76" alt="" />
+</p>
 
-**A Lightroom Classic publish plugin that turns your catalogue into the image backend for a static site.**
+<h1 align="center">Light3</h1>
 
-Organise photos into published collections and hit Publish. Light3 uploads them to S3-compatible storage and writes a manifest recording which photos each collection holds and in what order, so your build pipeline can render a gallery in exactly the order you set in Lightroom.
-
-Works with **Cloudflare R2**, **AWS S3**, **Backblaze B2**, **MinIO**, and any other S3-compatible endpoint. Signing happens locally, so your credentials never leave your machine. This README is written for people who want to install and run it.
+<p align="center"><strong>Publish from Lightroom Classic straight to S3-compatible storage.</strong></p>
 
 <p align="center">
-  <img src="docs/publish.png" width="640" alt="The Light3 publish service in Lightroom Classic, showing photos queued to re-publish above a grid of already-published photos in custom order" />
+  Your catalogue becomes the image backend for a static site — in exactly the order you arranged it,<br />
+  with credentials that never leave your Mac.
 </p>
+
+<p align="center">
+  <a href="https://github.com/thkleinert/Light3/releases/latest"><strong>Download</strong></a> &nbsp;·&nbsp;
+  <a href="#installation">Install</a> &nbsp;·&nbsp;
+  <a href="#setting-up-a-publish-service">Set up</a> &nbsp;·&nbsp;
+  <a href="#troubleshooting">Troubleshooting</a>
+</p>
+
+<p align="center">
+  <img src="docs/mockups/publish.png" width="780" alt="Lightroom Classic showing the Light3 publish service: one photo queued to re-publish above a grid of published photos in custom order" />
+</p>
+
+---
+
+## Why Light3
+
+A static site generator is a fine way to *publish* photographs and a poor way to *manage* them. Your catalogue already knows which frames are worth showing, how they group together, and what order they belong in. Getting that out of Lightroom normally means exporting to a folder, renaming files, uploading them somewhere, and then hand-maintaining a list of what goes where.
+
+Light3 deletes that middle step. Photos go from a published collection to your bucket, and a manifest records which photos each collection holds and in what sequence — so your build can reproduce the arrangement you made in Lightroom, without you describing it twice.
+
+- **Curate where you already are.** Drag to reorder, add, remove. Hit Publish.
+- **Only what changed moves.** Lightroom tracks what is current; edits re-upload, everything else is skipped.
+- **Credentials stay on your machine.** Signing runs through a bundled local helper — no proxy, no intermediary service, no keys in the plugin.
+
+Works with **Cloudflare R2**, **AWS S3**, **Backblaze B2**, **MinIO**, and any other S3-compatible endpoint. This README is written for people who want to install and run it.
+
+---
 
 ## Contents
 
+- [Why Light3](#why-light3)
 - [Overview](#overview)
   - [Architecture](#architecture)
 - [Requirements](#requirements)
@@ -82,6 +111,10 @@ Go to the [Releases page](https://github.com/thkleinert/Light3/releases) and dow
 
 ### 2. Install the Lightroom plugin
 
+<p align="center">
+  <img src="docs/mockups/plugin-manager.png" width="640" alt="Lightroom Classic Library module with the Plug-in Manager open" />
+</p>
+
 Option A — copy to the standard plugins folder:
 
 ```bash
@@ -104,6 +137,10 @@ Restart Lightroom after installing.
 ---
 
 ## Setting up a Publish Service
+
+<p align="center">
+  <img src="docs/mockups/setup.png" width="640" alt="The Light3 publish service configuration dialog in Lightroom Classic" />
+</p>
 
 1. Open the **Library** module.
 2. In the **Publish Services** panel (left sidebar), find **Light3** and click **Set Up…**
