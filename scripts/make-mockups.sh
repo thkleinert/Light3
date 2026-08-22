@@ -1,8 +1,8 @@
 #!/bin/bash
 # Composite the raw screenshots into MacBook-style frames for the README.
-# Re-runnable: overwrites docs/mockups/*.png from the screenshots in docs/.
+# Re-runnable: overwrites assets/mockups/*.png from assets/screenshots/.
 set -e
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 W=1440; H=900; B=20; CHIN=42; R=30          # screen, bezel, chin, corner radius
 LIDW=$((W + 2*B)); LIDH=$((H + B + CHIN))
@@ -36,7 +36,7 @@ frame() {
   rm -rf "$tmp"
 }
 
-frame publish.png             mockups/publish.png
-frame setup_plugin.png        mockups/setup.png
-frame find_plugin_manager.png mockups/plugin-manager.png
-for f in mockups/*.png; do echo "  $f  $(magick identify -format '%wx%h' "$f")  $(stat -f%z "$f") bytes"; done
+frame assets/screenshots/publish.png             assets/mockups/publish.png
+frame assets/screenshots/setup_plugin.png        assets/mockups/setup.png
+frame assets/screenshots/find_plugin_manager.png assets/mockups/plugin-manager.png
+for f in assets/mockups/*.png; do echo "  $f  $(magick identify -format '%wx%h' "$f")  $(stat -f%z "$f") bytes"; done

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.svg" width="76" alt="" />
+  <img src="assets/logo.svg" width="76" alt="" />
 </p>
 
 <h1 align="center">Light3</h1>
@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/mockups/publish.png" width="780" alt="Lightroom Classic showing the Light3 publish service: one photo queued to re-publish above a grid of published photos in custom order" />
+  <img src="assets/mockups/publish.png" width="780" alt="Lightroom Classic showing the Light3 publish service: one photo queued to re-publish above a grid of published photos in custom order" />
 </p>
 
 ---
@@ -112,7 +112,7 @@ Go to the [Releases page](https://github.com/thkleinert/Light3/releases) and dow
 ### 2. Install the Lightroom plugin
 
 <p align="center">
-  <img src="docs/mockups/plugin-manager.png" width="640" alt="Lightroom Classic Library module with the Plug-in Manager open" />
+  <img src="assets/mockups/plugin-manager.png" width="640" alt="Lightroom Classic Library module with the Plug-in Manager open" />
 </p>
 
 Option A — copy to the standard plugins folder:
@@ -139,7 +139,7 @@ Restart Lightroom after installing.
 ## Setting up a Publish Service
 
 <p align="center">
-  <img src="docs/mockups/setup.png" width="640" alt="The Light3 publish service configuration dialog in Lightroom Classic" />
+  <img src="assets/mockups/setup.png" width="640" alt="The Light3 publish service configuration dialog in Lightroom Classic" />
 </p>
 
 1. Open the **Library** module.
@@ -339,9 +339,15 @@ Light3/
 │   ├── build.sh                # Builds universal macOS binary and installs locally
 │   ├── go.mod
 │   └── go.sum
+├── assets/
+│   ├── logo.svg               # Mark used in this README
+│   ├── screenshots/           # Raw captures, the source for the mockups
+│   └── mockups/               # Framed versions shown in this README
+├── scripts/
+│   └── make-mockups.sh        # Regenerates assets/mockups from assets/screenshots
 └── .github/workflows/
-    ├── release-please.yml      # Automates Release PRs and versioning
-    └── release.yml             # Called by release-please: builds binary + attaches plugin zip
+    ├── release-please.yml     # Automates Release PRs and versioning
+    └── release.yml            # Called by release-please: builds binary + attaches plugin zip
 ```
 
 ---
