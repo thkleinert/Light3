@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.1](https://github.com/thkleinert/Light3/compare/v1.3.0...v1.3.1) (2026-08-22)
+
+
+### Bug Fixes
+
+* let the manifest follow a renamed collection ([#38](https://github.com/thkleinert/Light3/issues/38)) ([cc4ba65](https://github.com/thkleinert/Light3/commit/cc4ba65c326eeea47961699b3cef03e9f7da06d1))
+* point the README at the moved assets ([#36](https://github.com/thkleinert/Light3/issues/36)) ([9dad219](https://github.com/thkleinert/Light3/commit/9dad219eb60888aa6553ed3b6f4199017d29c5ff))
+
 ## [1.3.0](https://github.com/thkleinert/Light3/compare/v1.2.3...v1.3.0) (2026-08-21)
 
 
