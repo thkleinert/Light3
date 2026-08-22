@@ -1,8 +1,44 @@
 # Light3
 
-Lightroom Classic publish plugin for S3-compatible storage.
+**A Lightroom Classic publish plugin that turns your catalogue into the image backend for a static site.**
 
-Works with **Cloudflare R2**, **AWS S3**, **Backblaze B2**, **MinIO**, and any other S3-compatible endpoint.
+Organise photos into published collections and hit Publish. Light3 uploads them to S3-compatible storage and writes a manifest recording which photos each collection holds and in what order, so your build pipeline can render a gallery in exactly the order you set in Lightroom.
+
+Works with **Cloudflare R2**, **AWS S3**, **Backblaze B2**, **MinIO**, and any other S3-compatible endpoint. Signing happens locally, so your credentials never leave your machine. This README is written for people who want to install and run it.
+
+<p align="center">
+  <img src="docs/publish.png" width="640" alt="The Light3 publish service in Lightroom Classic, showing photos queued to re-publish above a grid of already-published photos in custom order" />
+</p>
+
+## Contents
+
+- [Overview](#overview)
+  - [Architecture](#architecture)
+- [Requirements](#requirements)
+- [Installation](#installation)
+  - [1. Download the plugin](#1-download-the-plugin)
+  - [2. Install the Lightroom plugin](#2-install-the-lightroom-plugin)
+- [Setting up a Publish Service](#setting-up-a-publish-service)
+- [Publishing photos](#publishing-photos)
+  - [Collections and collection sets](#collections-and-collection-sets)
+  - [Storage layout](#storage-layout)
+    - [Switching an existing service to flat storage](#switching-an-existing-service-to-flat-storage)
+  - [File naming](#file-naming)
+  - [Sort order](#sort-order)
+    - [Pushing a new order without re-uploading](#pushing-a-new-order-without-re-uploading)
+  - [Re-publishing](#re-publishing)
+  - [Removing photos](#removing-photos)
+- [Provider-specific setup](#provider-specific-setup)
+  - [Cloudflare R2](#cloudflare-r2)
+  - [AWS S3](#aws-s3)
+  - [Backblaze B2](#backblaze-b2)
+- [File structure](#file-structure)
+- [Troubleshooting](#troubleshooting)
+- [Development](#development)
+  - [Reloading the plugin in Lightroom](#reloading-the-plugin-in-lightroom)
+  - [Building the signing helper locally](#building-the-signing-helper-locally)
+  - [Releases](#releases)
+  - [Contributing](#contributing)
 
 ---
 
