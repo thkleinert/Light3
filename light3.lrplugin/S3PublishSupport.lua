@@ -510,10 +510,18 @@ local function imposeSortOrderOnPublishedCollection(publishSettings, info, remot
   end
   if #finalKeys == 0 then return end
 
-  -- `info` carries no collection object, so the path comes from the remote
-  -- collection id recorded during publish, falling back to info.parents/name.
-  local collectionPath = tostring((info and info.remoteCollectionId) or '')
-  if collectionPath == '' then collectionPath = collectionPathFromInfo(info) end
+  -- Derive the path from the collection's live position in the hierarchy.
+  -- info.parents holds collection sets only -- not the publish service -- so
+  -- this produces the same shape as collectionPathFor does at publish time.
+  --
+  -- The remote id recorded at the last publish is only a fallback. Preferring
+  -- it would ignore renames: recordRemoteCollectionId runs inside
+  -- processRenderedPhotos, so a Publish Now after a rename renders nothing,
+  -- re-records nothing, and would rewrite the manifest under the stale name.
+  local collectionPath = collectionPathFromInfo(info)
+  if collectionPath == '' then
+    collectionPath = tostring((info and info.remoteCollectionId) or '')
+  end
 
   local _, manifestKey = storageLayout(publishSettings, collectionPath)
   local collectionName = collectionPath:match('([^/]+)$') or ''
@@ -639,9 +647,58 @@ return {
   deletePhotosFromPublishedCollection      = deletePhotosFromPublishedCollection,
   imposeSortOrderOnPublishedCollection     = imposeSortOrderOnPublishedCollection,
 
-  -- Optional: called when a collection is renamed — update the prefix if needed
+  -- Called when a collection or collection set is renamed. Under flat storage
+  -- the images are prefix-independent, so only the manifest has to move, and
+  -- it can move immediately rather than waiting for the next publish.
+  --
+  -- Deliberately does nothing in nested mode: there the images live under the
+  -- collection's own prefix, so a rename would mean copying every object and
+  -- rewriting Lightroom's record of each published photo.
   renamePublishedCollection = function(publishSettings, info)
-    -- No-op for now; keys are not renamed automatically
+    if not publishSettings.flatStorage then return end
+
+    local collection = info and info.publishedCollection
+    if not collection or type(collection.getName) ~= 'function' then return end
+
+    local newPath = collectionPathFor(collection)
+    local oldPath = tostring((info and info.remoteId) or '')
+    if newPath == '' or oldPath == '' or newPath == oldPath then return end
+
+    local _, oldKey = storageLayout(publishSettings, oldPath)
+    local _, newKey = storageLayout(publishSettings, newPath)
+    if oldKey == newKey then return end
+
+    local args = {
+      endpoint          = publishSettings.endpoint,
+      bucket            = publishSettings.bucket,
+      region            = publishSettings.region or 'auto',
+      accessKeyId       = publishSettings.accessKeyId,
+      secretAccessKey   = publishSettings.secretAccessKey,
+      signingHelperPath = signingHelperPath,
+    }
+
+    local get = {}; for k, v in pairs(args) do get[k] = v end
+    get.key = oldKey
+    local manifest = S3Upload.getContent(get)
+    if not manifest then return end   -- nothing published under the old name yet
+
+    -- Keep the collection field in step with the key it now lives under.
+    local newName = newPath:match('([^/]+)$') or ''
+    manifest = manifest:gsub('"collection"%s*:%s*"[^"]*"',
+                             '"collection":"' .. newName .. '"', 1)
+
+    local put = {}; for k, v in pairs(args) do put[k] = v end
+    put.key = newKey; put.content = manifest
+    local ok, err = S3Upload.putContent(put)
+    if not ok then
+      LrDialogs.message('Light3: could not move the manifest',
+                        err or 'unknown error', 'critical')
+      return
+    end
+
+    local del = {}; for k, v in pairs(args) do del[k] = v end
+    del.key = oldKey
+    S3Upload.delete(del)
   end,
 
 }
