@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/thkleinert/Light3/compare/v1.2.3...v1.3.0) (2026-08-21)
+
+
+### Features
+
+* optional flat storage with a decoupled manifest path ([#30](https://github.com/thkleinert/Light3/issues/30)) ([9c4624c](https://github.com/thkleinert/Light3/commit/9c4624cdb43e706c864e3385dad252dc25f27af6))
+
 ## [1.2.3](https://github.com/thkleinert/Light3/compare/v1.2.2...v1.2.3) (2026-08-20)
 
 
